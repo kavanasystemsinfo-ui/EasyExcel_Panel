@@ -17,7 +17,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Excel en la nube de solo lectura | **DESPLEGADO** |
 | API FastAPI: `/health` + OpenAPI | **VERIFICADO** (2 tests + smoke real) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
-| CI en GitHub Actions (backend + frontend) | Implementado (se ejecuta en cada push) |
+| CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
 | Dashboard (upload, grid, edición, gráficos) | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md):
