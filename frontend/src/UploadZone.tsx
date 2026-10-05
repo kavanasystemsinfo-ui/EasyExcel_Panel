@@ -1,5 +1,4 @@
-import { useRef, useState } from 'react'
-import { MAX_UPLOAD_BYTES } from './api'
+import { useState, type ChangeEvent, type DragEvent } from 'react'
 
 type Props = {
   onFile: (file: File) => void
@@ -7,65 +6,65 @@ type Props = {
   error: string | null
 }
 
-function checkFile(file: File): string | null {
-  if (!file.name.toLowerCase().endsWith('.xlsx')) {
-    return 'Solo se admiten archivos .xlsx'
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return 'El archivo supera el limite de 10 MB'
-  }
-  return null
-}
+function UploadZone({ onFile, busy, error }: Props) {
+  const [inputError, setInputError] = useState<string | null>(null)
 
-export default function UploadZone({ onFile, busy, error }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [localError, setLocalError] = useState<string | null>(null)
-
-  const handle = (file: File | undefined) => {
-    if (!file || busy) return
-    const problem = checkFile(file)
-    setLocalError(problem)
-    if (!problem) onFile(file)
+  function aceptar(file: File | undefined | null): string | null {
+    if (!file || busy) return null
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      return 'Formato no soportado: sube un archivo .xlsx (no .xls ni .csv).'
+    }
+    onFile(file)
+    return null
   }
 
-  const shownError = localError ?? error
+  function handleInput(event: ChangeEvent<HTMLInputElement>) {
+    const localError = aceptar(event.target.files?.[0])
+    setInputError(localError)
+    event.target.value = ''
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setInputError(aceptar(event.dataTransfer.files?.[0]))
+  }
+
+  const mensaje = inputError ?? error
 
   return (
-    <section className="upload">
+    <div className="upload-stage">
       <div
+        className="upload-card"
         data-testid="upload-zone"
-        className={`upload-zone${busy ? ' is-busy' : ''}`}
         onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault()
-          handle(event.dataTransfer.files[0])
-        }}
+        onDrop={handleDrop}
       >
-        <p>
-          <strong>Sube tu Excel</strong>
+        <span className="upload-icon material-symbols-outlined" aria-hidden="true">
+          upload_file
+        </span>
+        <h2>¿Por dónde empezamos?</h2>
+        <p className="upload-sub">
+          Arrastra aquí tu archivo <strong>.xlsx</strong> o selecciónalo desde tu equipo.
         </p>
-        <p>Arrastra un archivo .xlsx aqui o</p>
-        <label className="upload-button">
-          {busy ? 'Cargando…' : 'Seleccionar archivo'}
+        <label className="btn btn-primary upload-pick">
+          {busy ? 'Cargando…' : 'Elegir archivo'}
           <input
-            ref={inputRef}
             type="file"
-            accept=".xlsx"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             aria-label="Archivo Excel"
             disabled={busy}
-            onChange={(event) => {
-              handle(event.target.files?.[0] ?? undefined)
-              event.target.value = ''
-            }}
+            onChange={handleInput}
           />
         </label>
-        <p className="upload-hint">Maximo 10 MB · primera fila como cabeceras</p>
+        {mensaje ? (
+          <p role="alert" className="error">
+            {mensaje}
+          </p>
+        ) : null}
+        <p className="upload-hint">Límites: 10 MB · 50 hojas · 200 columnas · 100.000 filas</p>
       </div>
-      {shownError ? (
-        <p role="alert" className="error">
-          {shownError}
-        </p>
-      ) : null}
-    </section>
+    </div>
   )
 }
+
+export default UploadZone

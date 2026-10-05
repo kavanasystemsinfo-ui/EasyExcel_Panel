@@ -17,10 +17,12 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Excel en la nube de solo lectura | **DESPLEGADO** |
 | API de workbooks: carga, listado, detalle, filas y borrado (5 endpoints) | **VERIFICADO** (17 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: upload con drag&drop, selector de hojas y grid paginado | **VERIFICADO** (11 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (29 tests Vitest) |
+| KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
+| Paneles Cobertura por centro y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Edición de celdas, filtros, gráficos | No implementado aún |
+| Edición de celdas, gráficos, IA real, exportación | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
 (React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker) y la persistencia
@@ -104,6 +106,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/core/      configuración y storage (FS + manifest)
   app/domain/    excel_parser (subproceso con timeout)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest)
+boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
 docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
@@ -114,6 +117,9 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
 
 1. **Fase 1** — Investigación, setup y dataset ✅ (este repo)
 2. **Fase 2** — Carga y visualización de Excel (upload, grid, selector de hojas) ✅
+   - **UI de dashboard** (sidebar de hojas, 6 tarjetas KPI calculadas del propio .xlsx,
+     grid con avatares/estados/paginador numérico, cobertura por centro y copiloto
+     pendiente de IA) ✅
 3. **Fase 3** — Edición de celdas y guardado/exportación
 4. **Fase 4** — Filtros, búsqueda y gráficos
 5. **Fase 5** — Exportación PDF/Excel y pulido de UI

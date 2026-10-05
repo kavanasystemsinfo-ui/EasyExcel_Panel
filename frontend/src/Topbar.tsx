@@ -1,0 +1,66 @@
+type Props = {
+  sheetCount: number
+  query: string
+  onQuery: (value: string) => void
+  onUploadClick: () => void
+}
+
+function Topbar({ sheetCount, query, onQuery, onUploadClick }: Props) {
+  return (
+    <header className="topbar">
+      <div className="topbar-left">
+        <h1>Panel de Operaciones</h1>
+        <span className="topbar-sheets">{sheetCount} hojas</span>
+      </div>
+
+      <div className="topbar-search">
+        <span className="material-symbols-outlined" aria-hidden="true">
+          search
+        </span>
+        <input
+          type="search"
+          aria-label="Filtrar filas"
+          placeholder="Filtrar filas por cualquier columna…"
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+        />
+      </div>
+
+      <div className="topbar-right">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled
+          title="IA sin conectar: llega en una fase posterior"
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            auto_awesome
+          </span>
+          Asistente IA
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled
+          title="Exportación: Fase 5"
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            download
+          </span>
+          Exportar
+        </button>
+        <button type="button" className="btn btn-primary" onClick={onUploadClick}>
+          Cargar .xlsx
+        </button>
+        <span className="chip-user" title="Datos de ejemplo, sin cuenta real">
+          <span className="avatar-mini" aria-hidden="true">
+            D
+          </span>
+          Modo demo
+        </span>
+      </div>
+    </header>
+  )
+}
+
+export default Topbar

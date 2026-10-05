@@ -73,4 +73,23 @@ describe('GridView', () => {
     expect(screen.getByRole('button', { name: /anterior/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled()
   })
+
+  it('explica el footer cuando hay filtro activo', () => {
+    render(
+      <GridView
+        sheetName="Ventas"
+        header={header}
+        rows={rows}
+        total={215}
+        offset={100}
+        limit={100}
+        onPage={vi.fn()}
+        filtered
+      />,
+    )
+    expect(
+      screen.getByText('2 de 215 filas en la página 2 (filtro activo)'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Mostrando/)).not.toBeInTheDocument()
+  })
 })
