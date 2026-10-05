@@ -9,3 +9,4 @@ env/
 Thumbs.db
 .idea/
 .vscode/
+backend/data/uploads/

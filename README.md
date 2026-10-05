@@ -8,20 +8,24 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 1 (dataset, API base y tooling)
+## Estado actual: Fase 2 (carga y visualización)
 
 | Componente | Estado |
 |---|---|
 | Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
 | Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
 | Excel en la nube de solo lectura | **DESPLEGADO** |
-| API FastAPI: `/health` + OpenAPI | **VERIFICADO** (2 tests + smoke real) |
+| API de workbooks: carga, listado, detalle, filas y borrado (5 endpoints) | **VERIFICADO** (17 tests + smoke con el dataset real) |
+| Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
+| UI: upload con drag&drop, selector de hojas y grid paginado | **VERIFICADO** (11 tests Vitest) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Dashboard (upload, grid, edición, gráficos) | No implementado aún |
+| Edición de celdas, filtros, gráficos | No implementado aún |
 
-El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md):
-React + TypeScript (Vite) / FastAPI + openpyxl / PostgreSQL / Docker.
+El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
+(React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker) y la persistencia
+de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
+(FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas).
 
 ### Excel de demo en la nube (solo lectura)
 
@@ -83,7 +87,7 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload        # API en http://localhost:8000
 ruff check . && mypy app && pytest   # verificaciones
 
-# Frontend (Node 24+)
+# Frontend (Node 24+) — con el backend levantado (proxy /api -> :8000 en dev)
 cd frontend
 npm install
 npm run dev                          # UI en http://localhost:5173
@@ -96,8 +100,11 @@ La documentación OpenAPI se genera automáticamente en `/docs` y `/openapi.json
 
 ```
 backend/   FastAPI + Pydantic (app/), tests/ (pytest)
+  app/api/       rutas y esquemas (workbooks, health)
+  app/core/      configuración y storage (FS + manifest)
+  app/domain/    excel_parser (subproceso con timeout)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest)
-docs/adr/  Decisiones de arquitectura (ADR-0001: stack)
+docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
 .github/   CI: ruff + mypy + pytest · oxlint + vitest + build
@@ -106,14 +113,12 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
 ## Roadmap
 
 1. **Fase 1** — Investigación, setup y dataset ✅ (este repo)
-2. **Fase 2** — Carga y visualización de Excel (upload, grid, selector de hojas)
+2. **Fase 2** — Carga y visualización de Excel (upload, grid, selector de hojas) ✅
 3. **Fase 3** — Edición de celdas y guardado/exportación
 4. **Fase 4** — Filtros, búsqueda y gráficos
 5. **Fase 5** — Exportación PDF/Excel y pulido de UI
 6. **Fase 6** — Autenticación y multiusuario (opcional)
 7. **Fase 7** — Docker, despliegue y documentación final
-
-Pendiente de decisión: stack definitivo de frontend/backend (Fase 1).
 
 ## Nota de privacidad
 
