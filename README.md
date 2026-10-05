@@ -8,17 +8,20 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 1 (dataset + validación de coherencia)
+## Estado actual: Fase 1 (dataset, API base y tooling)
 
 | Componente | Estado |
 |---|---|
 | Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
 | Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
 | Excel en la nube de solo lectura | **DESPLEGADO** |
+| API FastAPI: `/health` + OpenAPI | **VERIFICADO** (2 tests + smoke real) |
+| Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
+| CI en GitHub Actions (backend + frontend) | Implementado (se ejecuta en cada push) |
 | Dashboard (upload, grid, edición, gráficos) | No implementado aún |
 
-Lo que existe hoy es la **capa de datos** del producto: un Excel de demostración
-completamente coherente y regenerable, pensado para servir de fuente al dashboard.
+El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md):
+React + TypeScript (Vite) / FastAPI + openpyxl / PostgreSQL / Docker.
 
 ### Excel de demo en la nube (solo lectura)
 
@@ -71,11 +74,33 @@ python scripts/verificar_dataset.py      # relee el xlsx y revalida todas las re
 
 Salida esperada de la verificación: `READ-BACK OK: xlsx reabierto, 0 errores de coherencia`.
 
+## Desarrollo
+
+```bash
+# Backend (Python 3.11+)
+cd backend
+pip install -e ".[dev]"
+uvicorn app.main:app --reload        # API en http://localhost:8000
+ruff check . && mypy app && pytest   # verificaciones
+
+# Frontend (Node 24+)
+cd frontend
+npm install
+npm run dev                          # UI en http://localhost:5173
+npm run lint && npm test && npm run build
+```
+
+La documentación OpenAPI se genera automáticamente en `/docs` y `/openapi.json`.
+
 ## Estructura
 
 ```
-data/          empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
-scripts/       generar_dataset_demo.py · verificar_dataset.py
+backend/   FastAPI + Pydantic (app/), tests/ (pytest)
+frontend/  React + TypeScript con Vite (src/, tests con Vitest)
+docs/adr/  Decisiones de arquitectura (ADR-0001: stack)
+data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
+scripts/   generar_dataset_demo.py · verificar_dataset.py
+.github/   CI: ruff + mypy + pytest · oxlint + vitest + build
 ```
 
 ## Roadmap
