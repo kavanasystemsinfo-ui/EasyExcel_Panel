@@ -17,7 +17,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Excel en la nube de solo lectura | **DESPLEGADO** |
 | API de workbooks: carga, listado, detalle, filas, borrado y demo (6 endpoints) | **VERIFICADO** (20 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (85 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (89 tests Vitest) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
 | Paneles Cobertura por centro y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
 | Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |

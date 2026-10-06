@@ -194,3 +194,96 @@ describe('GridView editable', () => {
     expect(onDeleteRow).toHaveBeenCalledWith(0)
   })
 })
+
+describe('GridView filtros', () => {
+  it('edita sobre rowIds y no sobre el offset con filtros activos', () => {
+    const onEdit = vi.fn()
+    render(
+      <GridView
+        sheetName="Ventas"
+        header={header}
+        rows={rows}
+        rowIds={[30, 45]}
+        total={2}
+        offset={0}
+        limit={100}
+        onPage={vi.fn()}
+        onEdit={onEdit}
+      />,
+    )
+    expect(screen.getAllByText('46').length).toBeGreaterThan(0)
+    fireEvent.dblClick(screen.getByRole('cell', { name: 'Mesa' }))
+    const input = screen.getByDisplayValue('Mesa')
+    fireEvent.change(input, { target: { value: 'Mesa nova' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onEdit).toHaveBeenCalledWith(45, 0, 'Mesa nova')
+  })
+
+  it('abre el menu de la columna y aplica el valor elegido', () => {
+    const onFiltros = vi.fn()
+    render(
+      <GridView
+        sheetName="Ventas"
+        header={header}
+        rows={rows}
+        allRows={[...rows, ['Sofa', 9], ['Lampara', 4]]}
+        filtros={[]}
+        onFiltros={onFiltros}
+        total={4}
+        offset={0}
+        limit={100}
+        onPage={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrar por Producto' }))
+    const opciones = screen.getAllByRole('checkbox')
+    expect(opciones).toHaveLength(3)
+    const labelSofa = screen
+      .getByText('Sofa', { selector: '.filter-item-text' })
+      .closest('label')
+    fireEvent.click(labelSofa!.querySelector('input')!)
+    expect(onFiltros).toHaveBeenCalledWith([
+      { col: 0, tipo: 'valores', valores: ['Sofa'] },
+    ])
+  })
+
+  it('quita el filtro con el boton Limpiar', () => {
+    const onFiltros = vi.fn()
+    render(
+      <GridView
+        sheetName="Ventas"
+        header={header}
+        rows={rows}
+        allRows={rows}
+        filtros={[{ col: 0, tipo: 'valores', valores: ['Sofa'] }]}
+        onFiltros={onFiltros}
+        total={2}
+        offset={0}
+        limit={100}
+        onPage={vi.fn()}
+      />,
+    )
+    const boton = screen.getByRole('button', { name: 'Filtrar por Producto' })
+    expect(boton.className).toContain('is-on')
+    fireEvent.click(boton)
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }))
+    expect(onFiltros).toHaveBeenCalledWith([])
+  })
+
+  it('resalta la fila que llega desde la busqueda global', () => {
+    render(
+      <GridView
+        sheetName="Ventas"
+        header={header}
+        rows={rows}
+        total={2}
+        offset={0}
+        limit={100}
+        onPage={vi.fn()}
+        highlight={1}
+      />,
+    )
+    const destacada = screen.getByRole('cell', { name: 'Mesa' }).closest('tr')
+    expect(destacada?.className).toContain('is-highlight')
+  })
+})
