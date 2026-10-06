@@ -8,15 +8,20 @@
 La Fase 3 abre el panel a visitantes anónimos: al entrar se carga un libro demo
 y el usuario puede crear campos, añadir filas, editar y eliminar. Esos cambios
 deben sobrevivir a un refresh sin tocar el servidor, porque no hay usuarios ni
-multiusuario todavía. El problema de diseño es qué mecanismo de identificación
-usar para esa sesión.
+multiusuario todavía. El producto exige además que la sesión **se restablezca
+sola al cerrar el navegador o volver a entrar**: la edición es temporal por
+visita, no un estado permanente. El problema de diseño es qué mecanismo de
+identificación y de almacenamiento usar para esa sesión.
 
 ## Decisión
 
-- Los cambios de edición viven solo en el navegador:
-  `localStorage['easyexcel:sesion:v1']` guarda `{ token, cambios, wb, guardadoEn }`
+- Los cambios de edición viven solo en el navegador, en **`sessionStorage`**
+  (`sessionStorage['easyexcel:sesion:v1']` = `{ token, cambios, wb, guardadoEn }`)
   con el libro completo ya cargado (`WorkbookFull`), de modo que un refresh
-  repinta todo sin llamadas de red.
+  repinta todo sin llamadas de red y **el cierre del navegador lo borra solo**,
+  garantía del estándar y no un intento de limpieza desde la app. Una sesión
+  heredada de la primera versión en `localStorage` se ignora y se limpia al
+  cargar.
 - El identificador de sesión es `token = crypto.randomUUID()` generado en el
   cliente (`nuevoToken()`), visible en la UI como "Sesión local a01f97af".
   **No se emite JWT ni existe endpoint de sesión**: sería teatro de seguridad si
@@ -34,8 +39,16 @@ usar para esa sesión.
 
 - Cada visitante edita su propia copia: no hay sincronización entre navegadores
   ni entre equipos. Es el comportamiento esperado en una demo local.
-- Si un usuario supera la cuota de `localStorage` (~5 MB), los cambios se aplican
-  en memoria pero no persisten tras el refresh; se avisa y se ofrece restablecer.
+- Cada pestaña tiene su propia sesión: abrir dos pestañas da dos copias
+  independientes, ambas arrancan del original. Coherente con "cada visita nueva
+  empieza limpia".
+- `sessionStorage` (~5 MB por origen) se pierde al cerrar el navegador, que es
+  justo el requisito; si un usuario supera la cuota, los cambios se aplican en
+  memoria pero no persisten tras el refresh; se avisa y se ofrece restablecer.
+- Excepción conocida: si el navegador restaura la sesión del usuario
+  ("continuar donde dejaste"), algunas versiones de Chromium también devuelven
+  el `sessionStorage`. No dependemos de esa excepción: el caso normal de cierre
+  total borra la sesión.
 - Subir un `.xlsx` propio descarta la sesión del demo: el upload sustituye el
   libro activo y genera un token nuevo.
 - Cuando llegue la Fase 6 (usuarios y sync multiusuario), este mismo contrato se

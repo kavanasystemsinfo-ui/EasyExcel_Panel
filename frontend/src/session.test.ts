@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { borrarSesion, cargarSesion, guardarSesion, nuevoToken } from './session'
+import {
+  CLAVE_SESION,
+  borrarSesion,
+  cargarSesion,
+  guardarSesion,
+  nuevoToken,
+} from './session'
 import type { WorkbookFull } from './edit'
 
 const wb: WorkbookFull = {
@@ -12,6 +18,7 @@ const wb: WorkbookFull = {
 afterEach(() => {
   vi.restoreAllMocks()
   localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe('sesion local', () => {
@@ -28,8 +35,23 @@ describe('sesion local', () => {
 
   it('devuelve null con datos corruptos o sin sesion', () => {
     expect(cargarSesion()).toBeNull()
-    localStorage.setItem('easyexcel:sesion:v1', '{no-json')
+    sessionStorage.setItem(CLAVE_SESION, '{no-json')
     expect(cargarSesion()).toBeNull()
+  })
+
+  it('vive solo en sessionStorage: se borra al cerrar el navegador', () => {
+    guardarSesion({ token: 'tok-2', cambios: 1, wb, guardadoEn: 'ahora' })
+    expect(sessionStorage.getItem(CLAVE_SESION)).not.toBeNull()
+    expect(localStorage.getItem(CLAVE_SESION)).toBeNull()
+  })
+
+  it('ignora y limpia una sesion heredada de localStorage', () => {
+    localStorage.setItem(
+      CLAVE_SESION,
+      JSON.stringify({ token: 'viejo', cambios: 9, wb, guardadoEn: 'ayer' }),
+    )
+    expect(cargarSesion()).toBeNull()
+    expect(localStorage.getItem(CLAVE_SESION)).toBeNull()
   })
 
   it('reporta false si el navegador no tiene espacio', () => {

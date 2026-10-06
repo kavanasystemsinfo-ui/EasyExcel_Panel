@@ -32,7 +32,7 @@ El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
 de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
 (FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas) y
 la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
-(localStorage por visitante, sin JWT hasta que haya multiusuario).
+(sessionStorage por visitante: se restablece al cerrar el navegador, sin JWT hasta que haya multiusuario).
 
 ### Excel de demo en la nube (solo lectura)
 
@@ -112,7 +112,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/domain/    excel_parser (subproceso con timeout)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest)
   src/edit.ts     motor de edición de hojas (puro, con límites)
-  src/session.ts  sesión local por visitante (localStorage)
+  src/session.ts  sesión local por visitante (sessionStorage, se borra al cerrar)
 boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
 docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS · 0003: sesión local)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
@@ -129,8 +129,9 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
      pendiente de IA) ✅
 3. **Fase 3** — Demo automática y edición local ✅
    - Al entrar se carga el libro demo del servidor; cada visitante edita en su
-     navegador (celdas, filas y columnas) con sesión local en `localStorage` y
-     botón "Restablecer" al original (ADR-0003)
+     navegador (celdas, filas y columnas) con sesión en `sessionStorage` que se
+     restablece sola al cerrar el navegador, y botón "Restablecer" al original
+     (ADR-0003)
 4. **Fase 4** — Filtros, búsqueda y gráficos
 5. **Fase 5** — Exportación PDF/Excel y pulido de UI
 6. **Fase 6** — Autenticación y multiusuario (opcional)

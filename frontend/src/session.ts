@@ -18,7 +18,8 @@ export function nuevoToken(): string {
 
 export function cargarSesion(): Sesion | null {
   try {
-    const crudo = localStorage.getItem(CLAVE_SESION)
+    localStorage.removeItem(CLAVE_SESION)
+    const crudo = sessionStorage.getItem(CLAVE_SESION)
     if (!crudo) return null
     const datos = JSON.parse(crudo) as Sesion
     if (!datos?.token || !datos?.wb?.hojas) return null
@@ -30,7 +31,7 @@ export function cargarSesion(): Sesion | null {
 
 export function guardarSesion(sesion: Sesion): boolean {
   try {
-    localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion))
+    sessionStorage.setItem(CLAVE_SESION, JSON.stringify(sesion))
     return true
   } catch {
     return false
@@ -39,8 +40,8 @@ export function guardarSesion(sesion: Sesion): boolean {
 
 export function borrarSesion(): void {
   try {
-    localStorage.removeItem(CLAVE_SESION)
+    sessionStorage.removeItem(CLAVE_SESION)
   } catch {
-    // localStorage no disponible: no hay nada que borrar
+    // sessionStorage no disponible: no hay nada que borrar
   }
 }
