@@ -1,13 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   esColumnaEstado,
   esColumnaId,
   esColumnaNombre,
   formatCelda,
+  norm,
   num,
   tonoEstado,
   type Tono,
 } from './cells'
+import {
+  esColumnaNumerica,
+  valoresDistintos,
+  type Filtro,
+} from './filters'
 
 type Props = {
   sheetName: string
@@ -21,6 +27,11 @@ type Props = {
   filtered?: boolean
   onEdit?: (fila: number, col: number, valor: unknown) => void
   onDeleteRow?: (fila: number) => void
+  allRows?: unknown[][]
+  filtros?: Filtro[]
+  onFiltros?: (filtros: Filtro[]) => void
+  rowIds?: number[]
+  highlight?: number | null
 }
 
 type Edicion = { fila: number; col: number; borrador: string; original: unknown }
@@ -89,6 +100,11 @@ function GridView({
   filtered = false,
   onEdit,
   onDeleteRow,
+  allRows,
+  filtros = [],
+  onFiltros,
+  rowIds,
+  highlight = null,
 }: Props) {
   const [edicion, setEdicion] = useState<Edicion | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -99,9 +115,67 @@ function GridView({
     setEdicion(null)
   }
 
+  const [filtroCol, setFiltroCol] = useState<number | null>(null)
+  const [buscadorFiltro, setBuscadorFiltro] = useState('')
+  const filtroRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (edicion) inputRef.current?.focus()
   }, [edicion])
+
+  useEffect(() => {
+    if (filtroCol === null) return
+    function fuera(event: MouseEvent) {
+      if (filtroRef.current && !filtroRef.current.contains(event.target as Node)) {
+        setFiltroCol(null)
+      }
+    }
+    document.addEventListener('mousedown', fuera)
+    return () => document.removeEventListener('mousedown', fuera)
+  }, [filtroCol])
+
+  function abrirFiltro(col: number) {
+    setBuscadorFiltro('')
+    setFiltroCol((actual) => (actual === col ? null : col))
+  }
+
+  function filtroDe(col: number): Filtro | undefined {
+    return filtros.find((f) => f.col === col)
+  }
+
+  function aplicarFiltro(col: number, nuevo: Filtro | null) {
+    if (!onFiltros) return
+    const resto = filtros.filter((f) => f.col !== col)
+    onFiltros(nuevo ? [...resto, nuevo] : resto)
+  }
+
+  function toggleValor(col: number, valor: string) {
+    const actual = filtroDe(col)
+    const actuales = actual?.tipo === 'valores' ? actual.valores : []
+    const claves = new Set(actuales.map(norm))
+    const siguiente = claves.has(norm(valor))
+      ? actuales.filter((v) => norm(v) !== norm(valor))
+      : [...actuales, valor]
+    aplicarFiltro(col, siguiente.length ? { col, tipo: 'valores', valores: siguiente } : null)
+  }
+
+  function cambiarRango(col: number, campo: 'min' | 'max', crudo: string) {
+    const actual = filtroDe(col)
+    const base = actual?.tipo === 'rango' ? actual : { col, tipo: 'rango' as const }
+    const numero = crudo.trim() === '' ? undefined : Number(crudo)
+    const valor = numero !== undefined && Number.isFinite(numero) ? numero : undefined
+    const siguiente = { ...base, [campo]: valor }
+    const vacio = siguiente.min === undefined && siguiente.max === undefined
+    aplicarFiltro(col, vacio ? null : siguiente)
+  }
+
+  const datosMenu = allRows ?? rows
+  const colMenuAbierta = filtroCol !== null && !esColumnaNumerica(datosMenu, filtroCol)
+  const valoresMenu = useMemo(() => {
+    if (filtroCol === null || !colMenuAbierta) return []
+    return valoresDistintos(datosMenu, filtroCol)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroCol, colMenuAbierta, datosMenu])
 
   const visibles = header.map((_, i) => i).filter((i) => !hiddenCols.includes(i))
   const iDni = header.findIndex((col) => /\b(dni|nie|nif)\b/i.test(col))
@@ -135,11 +209,103 @@ function GridView({
               <th className="col-num" scope="col">
                 #
               </th>
-              {visibles.map((i) => (
-                <th key={`${header[i]}-${i}`} scope="col">
-                  {header[i]}
-                </th>
-              ))}
+              {visibles.map((i) => {
+                const filtro = filtroDe(i)
+                const rango = filtro?.tipo === 'rango' ? filtro : null
+                const seleccion =
+                  filtro?.tipo === 'valores'
+                    ? new Set(filtro.valores.map(norm))
+                    : new Set<string>()
+                const valoresFiltrados = valoresMenu.filter((v) =>
+                  norm(v.valor).includes(norm(buscadorFiltro)),
+                )
+                return (
+                  <th
+                    key={`${header[i]}-${i}`}
+                    scope="col"
+                    className={filtro ? 'has-filtro' : undefined}
+                  >
+                    <span className="th-label">{header[i]}</span>
+                    {onFiltros ? (
+                      <span className="th-filter" ref={filtroCol === i ? filtroRef : undefined}>
+                        <button
+                          type="button"
+                          className={`th-filter-btn${filtro ? ' is-on' : ''}`}
+                          aria-label={`Filtrar por ${header[i]}`}
+                          aria-expanded={filtroCol === i}
+                          onClick={() => abrirFiltro(i)}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            filter_alt
+                          </span>
+                        </button>
+                        {filtroCol === i ? (
+                          <div className="filter-menu" role="group" aria-label={`Filtro de ${header[i]}`}>
+                            {esColumnaNumerica(datosMenu, i) ? (
+                              <div className="filter-rango">
+                                <label>
+                                  Mín
+                                  <input
+                                    type="number"
+                                    aria-label={`Mínimo de ${header[i]}`}
+                                    value={rango?.min ?? ''}
+                                    onChange={(event) => cambiarRango(i, 'min', event.target.value)}
+                                  />
+                                </label>
+                                <label>
+                                  Máx
+                                  <input
+                                    type="number"
+                                    aria-label={`Máximo de ${header[i]}`}
+                                    value={rango?.max ?? ''}
+                                    onChange={(event) => cambiarRango(i, 'max', event.target.value)}
+                                  />
+                                </label>
+                              </div>
+                            ) : (
+                              <>
+                                <input
+                                  type="search"
+                                  className="filter-buscar"
+                                  placeholder="Buscar valor…"
+                                  aria-label={`Buscar valores de ${header[i]}`}
+                                  value={buscadorFiltro}
+                                  onChange={(event) => setBuscadorFiltro(event.target.value)}
+                                />
+                                <div className="filter-list">
+                                  {valoresFiltrados.length === 0 ? (
+                                    <p className="filter-hint">Sin valores que mostrar.</p>
+                                  ) : (
+                                    valoresFiltrados.map((valor) => (
+                                      <label key={valor.valor} className="filter-item">
+                                        <input
+                                          type="checkbox"
+                                          checked={seleccion.has(norm(valor.valor))}
+                                          onChange={() => toggleValor(i, valor.valor)}
+                                        />
+                                        <span className="filter-item-text">{valor.valor}</span>
+                                        <span className="filter-count">{valor.conteo}</span>
+                                      </label>
+                                    ))
+                                  )}
+                                </div>
+                              </>
+                            )}
+                            <button
+                              type="button"
+                              className="filter-clear"
+                              disabled={!filtro}
+                              onClick={() => aplicarFiltro(i, null)}
+                            >
+                              Limpiar
+                            </button>
+                          </div>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </th>
+                )
+              })}
               <th className="col-actions" scope="col">
                 Acciones
               </th>
@@ -147,9 +313,12 @@ function GridView({
           </thead>
           <tbody>
             {rows.map((fila, r) => {
-              const filaGlobal = offset + r
+              const filaGlobal = rowIds ? rowIds[r] : offset + r
               return (
-                <tr key={`${sheetName}-${filaGlobal}`}>
+                <tr
+                  key={`${sheetName}-${filaGlobal}`}
+                  className={highlight === filaGlobal ? 'is-highlight' : undefined}
+                >
                   <td className="col-num">{filaGlobal + 1}</td>
                   {visibles.map((i) => {
                     const col = header[i]

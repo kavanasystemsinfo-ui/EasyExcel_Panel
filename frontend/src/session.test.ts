@@ -7,6 +7,7 @@ import {
   nuevoToken,
 } from './session'
 import type { WorkbookFull } from './edit'
+import type { Vista } from './session'
 
 const wb: WorkbookFull = {
   id: 'abc',
@@ -64,5 +65,25 @@ describe('sesion local', () => {
   it('genera tokens unicos', () => {
     expect(nuevoToken()).not.toBe(nuevoToken())
     expect(nuevoToken()).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('conserva la vista opcional (filtros, hoja y pagina)', () => {
+    const vista: Vista = {
+      hoja: 'Ventas',
+      query: 'sara',
+      soloActivos: true,
+      ocultas: [1],
+      filtros: [{ col: 0, tipo: 'valores', valores: ['x'] }],
+      pagina: 100,
+    }
+    guardarSesion({ token: 'tok-v', cambios: 0, wb, guardadoEn: 'x', vista })
+    const cargada = cargarSesion()
+    expect(cargada?.vista).toEqual(vista)
+    expect(cargada?.cambios).toBe(0)
+  })
+
+  it('funciona sin vista (sesiones antiguas)', () => {
+    guardarSesion({ token: 'tok-s', cambios: 2, wb, guardadoEn: 'x' })
+    expect(cargarSesion()?.vista).toBeUndefined()
   })
 })

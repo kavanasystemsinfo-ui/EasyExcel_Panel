@@ -1,12 +1,23 @@
 import type { WorkbookFull } from './edit'
+import type { Filtro } from './filters'
 
 export const CLAVE_SESION = 'easyexcel:sesion:v1'
+
+export type Vista = {
+  hoja: string | null
+  query: string
+  soloActivos: boolean
+  ocultas: number[]
+  filtros: Filtro[]
+  pagina: number
+}
 
 export type Sesion = {
   token: string
   cambios: number
   wb: WorkbookFull
   guardadoEn: string
+  vista?: Vista
 }
 
 export function nuevoToken(): string {

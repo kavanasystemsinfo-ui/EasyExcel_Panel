@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
+
+export type ResultadoGlobal = { hoja: string; fila: number; celda: string }
+
 type Props = {
   sheetCount: number
   query: string
@@ -6,6 +10,8 @@ type Props = {
   token: string | null
   cambios: number
   onReset: () => void
+  resultados?: { total: number; items: ResultadoGlobal[] } | null
+  onIrA?: (hoja: string, fila: number) => void
 }
 
 function Topbar({
@@ -16,7 +22,23 @@ function Topbar({
   token,
   cambios,
   onReset,
+  resultados = null,
+  onIrA,
 }: Props) {
+  const [abierto, setAbierto] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    function fuera(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setAbierto(false)
+      }
+    }
+    document.addEventListener('mousedown', fuera)
+    return () => document.removeEventListener('mousedown', fuera)
+  }, [abierto])
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -24,7 +46,7 @@ function Topbar({
         <span className="topbar-sheets">{sheetCount} hojas</span>
       </div>
 
-      <div className="topbar-search">
+      <div className="topbar-search" ref={searchRef}>
         <span className="material-symbols-outlined" aria-hidden="true">
           search
         </span>
@@ -33,8 +55,36 @@ function Topbar({
           aria-label="Filtrar filas"
           placeholder="Filtrar filas por cualquier columna…"
           value={query}
-          onChange={(event) => onQuery(event.target.value)}
+          onChange={(event) => {
+            onQuery(event.target.value)
+            setAbierto(true)
+          }}
         />
+        {abierto && resultados && resultados.total > 0 ? (
+          <div className="search-global" aria-label="Resultados en todo el libro">
+            <p className="search-global-head">
+              {resultados.total} coincidencia{resultados.total === 1 ? '' : 's'} en el libro
+              <button type="button" className="search-global-close" onClick={() => setAbierto(false)}>
+                Cerrar
+              </button>
+            </p>
+            {resultados.items.map((item, index) => (
+              <button
+                key={`${item.hoja}-${item.fila}-${index}`}
+                type="button"
+                className="search-global-item"
+                onClick={() => {
+                  setAbierto(false)
+                  onIrA?.(item.hoja, item.fila)
+                }}
+              >
+                <span className="search-global-hoja">{item.hoja}</span>
+                <span className="search-global-fila">fila {item.fila + 1}</span>
+                <span className="search-global-celda">{item.celda}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="topbar-right">

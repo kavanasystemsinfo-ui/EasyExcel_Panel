@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Filtro } from './filters'
 
 type Props = {
   header: string[]
@@ -8,6 +9,8 @@ type Props = {
   ocultas: number[]
   onToggleCol: (index: number) => void
   coincidencias: number | null
+  filtros?: Filtro[]
+  onQuitarFiltro?: (col: number) => void
   onAddRow: () => void
   onAddCol: () => void
 }
@@ -20,6 +23,8 @@ function Toolbar({
   ocultas,
   onToggleCol,
   coincidencias,
+  filtros = [],
+  onQuitarFiltro,
   onAddRow,
   onAddCol,
 }: Props) {
@@ -58,6 +63,23 @@ function Toolbar({
           {coincidencias} coincidencia{coincidencias === 1 ? '' : 's'} en la página
         </span>
       ) : null}
+
+      {filtros.map((filtro) => (
+        <button
+          key={filtro.col}
+          type="button"
+          className="chip is-on"
+          aria-label={`Quitar filtro de ${header[filtro.col] ?? `columna ${filtro.col + 1}`}`}
+          onClick={() => onQuitarFiltro?.(filtro.col)}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            filter_alt
+          </span>
+          {header[filtro.col] ?? `Columna ${filtro.col + 1}`}
+          {filtro.tipo === 'rango' ? ' (rango)' : `: ${filtro.valores.length}`}
+          <span aria-hidden="true">✕</span>
+        </button>
+      ))}
 
       <span className="toolbar-sep" aria-hidden="true" />
 

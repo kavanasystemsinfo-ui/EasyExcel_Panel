@@ -8,6 +8,7 @@ import {
   type Workbook,
 } from './api'
 import { esColumnaEstado, norm } from './cells'
+import { generarGraficos } from './charts'
 import {
   anadirColumna,
   anadirFila,
@@ -16,8 +17,11 @@ import {
   hojaDe,
   type WorkbookFull,
 } from './edit'
+import { pasaFiltros, type Filtro } from './filters'
 import { calcularKpis, type SheetData } from './kpis'
+import { buscarEnLibro } from './search'
 import CoveragePanel from './CoveragePanel'
+import ChartsPanel from './ChartsPanel'
 import CopilotPanel from './CopilotPanel'
 import GridView from './GridView'
 import KpiCards from './KpiCards'
@@ -70,9 +74,12 @@ function App() {
   const [query, setQuery] = useState('')
   const [soloActivos, setSoloActivos] = useState(false)
   const [ocultas, setOcultas] = useState<number[]>([])
+  const [filtros, setFiltros] = useState<Filtro[]>([])
+  const [destacada, setDestacada] = useState<number | null>(null)
   const [hoy] = useState(() => new Date())
   const fileRef = useRef<HTMLInputElement>(null)
   const wbRef = useRef<WorkbookFull | null>(null)
+  const destacadaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function instalar(completo: WorkbookFull) {
     const tok = nuevoToken()
@@ -85,6 +92,8 @@ function App() {
     setQuery('')
     setSoloActivos(false)
     setOcultas([])
+    setFiltros([])
+    setDestacada(null)
     setRowsError(null)
     guardarSesion({
       token: tok,
@@ -118,13 +127,38 @@ function App() {
       setWb(sesion.wb)
       setToken(sesion.token)
       setCambios(sesion.cambios)
-      setHoja(sesion.wb.hojas[0]?.name ?? null)
+      const vista = sesion.vista
+      const hojaValida =
+        vista?.hoja && sesion.wb.hojas.some((h) => h.name === vista.hoja)
+      setHoja(hojaValida ? vista.hoja : (sesion.wb.hojas[0]?.name ?? null))
+      setQuery(vista?.query ?? '')
+      setSoloActivos(vista?.soloActivos ?? false)
+      setOcultas(vista?.ocultas ?? [])
+      const headerActiva = hojaValida
+        ? sesion.wb.hojas.find((h) => h.name === vista.hoja)?.header ?? []
+        : []
+      setFiltros(
+        (vista?.filtros ?? []).filter(
+          (f) => f.col >= 0 && f.col < headerActiva.length,
+        ),
+      )
+      setPagina(vista?.pagina ?? 0)
       setDemoCargando(false)
       return
     }
     void iniciarDemo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!token || !wb) return
+    const sesion = cargarSesion()
+    if (!sesion || sesion.token !== token) return
+    guardarSesion({
+      ...sesion,
+      vista: { hoja, query, soloActivos, ocultas, filtros, pagina },
+    })
+  }, [token, wb, hoja, query, soloActivos, ocultas, filtros, pagina])
 
   function persistir(completo: WorkbookFull, tok: string, numCambios: number) {
     const ok = guardarSesion({
@@ -189,17 +223,24 @@ function App() {
   const hojaActiva = wb && hoja ? hojaDe(wb, hoja) : null
   const conEstado = hojaActiva ? hojaActiva.header.some((col) => esColumnaEstado(col)) : false
 
-  const filtradas = useMemo(() => {
-    if (!hojaActiva) return []
-    let rows = hojaActiva.rows
+  const pares = useMemo(() => {
+    if (!hojaActiva) return [] as { fila: unknown[]; i: number }[]
+    let conIndice = hojaActiva.rows.map((fila, i) => ({ fila, i }))
     const texto = norm(query)
-    if (texto) rows = rows.filter((fila) => fila.some((celda) => norm(celda).includes(texto)))
+    if (texto) {
+      conIndice = conIndice.filter(({ fila }) =>
+        fila.some((celda) => norm(celda).includes(texto)),
+      )
+    }
     if (soloActivos && conEstado) {
       const iEstado = hojaActiva.header.findIndex((col) => esColumnaEstado(col))
-      rows = rows.filter((fila) => norm(fila[iEstado]) === 'activo')
+      conIndice = conIndice.filter(({ fila }) => norm(fila[iEstado]) === 'activo')
     }
-    return rows
-  }, [hojaActiva, query, soloActivos, conEstado])
+    if (filtros.length) {
+      conIndice = conIndice.filter(({ fila }) => pasaFiltros(fila, filtros))
+    }
+    return conIndice
+  }, [hojaActiva, query, soloActivos, conEstado, filtros])
 
   const kpisData = useMemo(() => {
     const data: Record<string, SheetData> = {}
@@ -208,14 +249,38 @@ function App() {
     return data
   }, [wb])
   const kpis = useMemo(() => calcularKpis(kpisData, hoy), [kpisData, hoy])
+  const graficos = useMemo(() => generarGraficos(kpisData), [kpisData])
 
-  const filtrando = Boolean(query.trim()) || (soloActivos && conEstado)
+  const busquedaGlobal = useMemo(() => {
+    if (!wb || norm(query).length < 2) return null
+    const resultado = buscarEnLibro(wb.hojas, query, 8)
+    return resultado.total > 0
+      ? { total: resultado.total, items: resultado.coincidencias }
+      : null
+  }, [wb, query])
+
+  const filtrando = Boolean(query.trim()) || (soloActivos && conEstado) || filtros.length > 0
 
   function seleccionarHoja(name: string) {
     setHoja(name)
     setPagina(0)
     setOcultas([])
+    setFiltros([])
+    setDestacada(null)
     setRowsError(null)
+  }
+
+  function irA(hojaDestino: string, fila: number) {
+    seleccionarHoja(hojaDestino)
+    setPagina(Math.floor(fila / PAGE_SIZE) * PAGE_SIZE)
+    setDestacada(fila)
+    if (destacadaTimer.current) clearTimeout(destacadaTimer.current)
+    destacadaTimer.current = setTimeout(() => setDestacada(null), 5000)
+  }
+
+  function quitarFiltro(col: number) {
+    setFiltros((prev) => prev.filter((f) => f.col !== col))
+    setPagina(0)
   }
 
   function cambiarQuery(valor: string) {
@@ -265,6 +330,8 @@ function App() {
           token={token}
           cambios={cambios}
           onReset={reset}
+          resultados={busquedaGlobal}
+          onIrA={irA}
         />
 
         <div className="app-content">
@@ -347,7 +414,9 @@ function App() {
                   prev.includes(i) ? prev.filter((n) => n !== i) : [...prev, i],
                 )
               }
-              coincidencias={query.trim() ? filtradas.length : null}
+              coincidencias={query.trim() ? pares.length : null}
+              filtros={filtros}
+              onQuitarFiltro={quitarFiltro}
               onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
               onAddCol={anadirColumnaDialogo}
             />
@@ -356,8 +425,9 @@ function App() {
               <GridView
                 sheetName={hojaActiva.name}
                 header={hojaActiva.header}
-                rows={filtradas.slice(pagina, pagina + PAGE_SIZE)}
-                total={filtradas.length}
+                rows={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.fila)}
+                rowIds={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.i)}
+                total={pares.length}
                 offset={pagina}
                 limit={PAGE_SIZE}
                 onPage={(nueva) => {
@@ -366,6 +436,13 @@ function App() {
                 }}
                 hiddenCols={ocultas}
                 filtered={filtrando}
+                allRows={hojaActiva.rows}
+                filtros={filtros}
+                onFiltros={(nuevos) => {
+                  setFiltros(nuevos)
+                  setPagina(0)
+                }}
+                highlight={destacada}
                 onEdit={(fila, col, valor) =>
                   aplicar((w) => editarCelda(w, hoja ?? '', fila, col, valor))
                 }
@@ -378,6 +455,7 @@ function App() {
 
           <section className="bottom-panels">
             <CopilotPanel />
+            {graficos.length ? <ChartsPanel graficos={graficos} /> : null}
             {kpis.cobertura?.length ? <CoveragePanel cobertura={kpis.cobertura} /> : null}
           </section>
         </div>

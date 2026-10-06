@@ -50,7 +50,7 @@ export type Kpis = {
   cobertura?: CoberturaCentro[]
 }
 
-function indice(header: string[], ...candidatos: string[]): number {
+export function indice(header: string[], ...candidatos: string[]): number {
   const normalizado = header.map(norm)
   for (const candidato of candidatos) {
     const exacto = normalizado.indexOf(norm(candidato))

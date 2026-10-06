@@ -8,7 +8,7 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 3 (demo automática y edición local)
+## Estado actual: Fase 4 (filtros, búsqueda y gráficos)
 
 | Componente | Estado |
 |---|---|
@@ -17,15 +17,19 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Excel en la nube de solo lectura | **DESPLEGADO** |
 | API de workbooks: carga, listado, detalle, filas, borrado y demo (6 endpoints) | **VERIFICADO** (20 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (53 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (85 tests Vitest) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
 | Paneles Cobertura por centro y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
 | Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |
 | Edición libre en cliente: celdas, filas y columnas con persistencia local | **VERIFICADO** (17 tests + E2E: persiste tras recarga) |
 | Sesión local por visitante y botón "Restablecer" al original | **VERIFICADO** (E2E navegador con capturas) |
+| Filtros por columna (valores con conteo y rango numérico) con chips quitables | **VERIFICADO** (12 tests + E2E: 215 → 30 filas y persistencia tras recarga) |
+| Búsqueda global en todas las hojas con salto a la fila encontrada | **VERIFICADO** (6 tests + E2E: "pendiente" navega de Empleados a Vacaciones) |
+| Gráficos de la hoja (barras y donut con selector de serie, recharts) | **VERIFICADO** (8 tests de series + E2E con SVG renderizado) |
+| Vista persistente (hoja, filtros, búsqueda, página) en la sesión | **VERIFICADO** (tests de sesión + E2E tras recarga) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Gráficos, IA real, exportación, multiusuario | No implementado aún |
+| IA real, exportación, multiusuario | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
 (React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker), la persistencia
@@ -132,7 +136,13 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
      navegador (celdas, filas y columnas) con sesión en `sessionStorage` que se
      restablece sola al cerrar el navegador, y botón "Restablecer" al original
      (ADR-0003)
-4. **Fase 4** — Filtros, búsqueda y gráficos
+4. **Fase 4** — Filtros, búsqueda y gráficos ✅
+   - Filtro por columna desde la cabecera de cada columna (valores con conteo
+     o rango numérico), con chip quitable en la barra de herramientas;
+     búsqueda global en todas las hojas con salto a la fila encontrada
+     (resaltada 5 s); gráficos de la hoja activa (barras y donut con selector
+     de serie, recharts); hoja, filtros, búsqueda y página quedan guardados en
+     la vista de la sesión local y se restauran al recargar
 5. **Fase 5** — Exportación PDF/Excel y pulido de UI
 6. **Fase 6** — Autenticación y multiusuario (opcional)
 7. **Fase 7** — Docker, despliegue y documentación final
