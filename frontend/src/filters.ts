@@ -55,3 +55,26 @@ export function aplicarFiltros(rows: unknown[][], filtros: Filtro[]): unknown[][
   if (filtros.length === 0) return rows
   return rows.filter((fila) => pasaFiltros(fila, filtros))
 }
+
+export function resumenFiltros(
+  header: string[],
+  query: string,
+  soloActivos: boolean,
+  filtros: Filtro[],
+): string[] {
+  const partes: string[] = []
+  const texto = query.trim()
+  if (texto) partes.push(`Búsqueda: ${texto}`)
+  if (soloActivos) partes.push('Solo activos')
+  for (const filtro of filtros) {
+    const col = header[filtro.col] ?? `Columna ${filtro.col + 1}`
+    if (filtro.tipo === 'valores') {
+      partes.push(`${col}: ${filtro.valores.join(', ')}`)
+    } else {
+      const min = filtro.min !== undefined ? String(filtro.min) : '…'
+      const max = filtro.max !== undefined ? String(filtro.max) : '…'
+      partes.push(`${col} ${min}–${max}`)
+    }
+  }
+  return partes
+}

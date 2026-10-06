@@ -18,12 +18,13 @@ import {
   hojaDe,
   type WorkbookFull,
 } from './edit'
-import { pasaFiltros, type Filtro } from './filters'
+import { pasaFiltros, resumenFiltros, type Filtro } from './filters'
 import { descargarBlob, nombreExport, payloadExport } from './export'
 import { calcularKpis, type SheetData } from './kpis'
 import { buscarEnLibro } from './search'
 import {
   ES_SECCION,
+  SECCIONES,
   graficosDeSeccion,
   hojasDeSeccion,
   kpisDeSeccion,
@@ -287,6 +288,13 @@ function App() {
     .map((h) => ({ name: h.name, rows: h.rows.length, cols: h.header.length }))
   const kpisSeccion = kpisDeSeccion(seccion)
   const graficosSeccion = graficosDeSeccion(seccion, graficos)
+  const nombreSeccion = SECCIONES.find((s) => s.id === seccion)?.nombre ?? 'Panel'
+  const filtrosImpresion = resumenFiltros(
+    hojaActiva?.header ?? [],
+    query,
+    soloActivos && conEstado,
+    filtros,
+  )
 
   function seleccionarHoja(name: string) {
     setHoja(name)
@@ -399,6 +407,21 @@ function App() {
         />
 
         <div className="app-content">
+          <div className="print-head">
+            <span className="print-head-title">
+              EasyExcel Panel · {nombreSeccion}
+            </span>
+            <span className="print-head-meta">
+              {seccion !== 'resumen' && hojaActiva ? `${hojaActiva.name} · ` : ''}
+              {hoy.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
+              {filtrosImpresion.length ? ` · ${filtrosImpresion.join(' · ')}` : ''}
+            </span>
+          </div>
+
           <section className="banner">
             <div>
               <h2>

@@ -1803,6 +1803,10 @@
 
 /* ---------------------------------------------------------------- print */
 
+.print-head {
+  display: none;
+}
+
 @media print {
   @page {
     margin: 12mm;
@@ -1820,14 +1824,37 @@
   .sidebar,
   .topbar,
   .toolbar,
-  .banner-actions,
-  .bottom-panels,
-  .grid-foot,
+  .banner,
+  .grid-head,
   .grid-meta,
+  .grid-foot,
   .error,
   .aviso,
   .loading,
-  .export-wrap {
+  .export-wrap,
+  .copilot {
+    display: none !important;
+  }
+
+  .print-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #cbd5e1;
+    color: #475569;
+    font-size: 11px;
+  }
+
+  .print-head-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .app-shell:has(.grid-section) .kpi-grid,
+  .app-shell:has(.grid-section) .bottom-panels {
     display: none !important;
   }
 
@@ -1842,6 +1869,7 @@
     height: auto;
     overflow: visible;
     display: block;
+    padding: 0;
   }
 
   .grid-scroll {
@@ -1849,15 +1877,19 @@
     overflow: visible;
   }
 
-  .grid-section,
-  .grid-card,
-  .alertas-card,
-  .kpi-grid,
-  .grid-table tr {
-    break-inside: avoid;
+  .grid-card {
+    border-radius: 0;
+    overflow: visible;
   }
 
-  .app-content {
-    padding: 0;
+  .grid-table thead {
+    display: table-header-group;
+  }
+
+  .grid-table tr,
+  .alertas-card,
+  .kpi-card,
+  .charts-card {
+    break-inside: avoid;
   }
 }

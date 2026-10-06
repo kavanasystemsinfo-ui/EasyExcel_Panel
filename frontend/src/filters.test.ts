@@ -3,6 +3,7 @@ import {
   aplicarFiltros,
   esColumnaNumerica,
   pasaFiltros,
+  resumenFiltros,
   valoresDistintos,
   type Filtro,
 } from './filters'
@@ -104,5 +105,42 @@ describe('pasaFiltros', () => {
   it('aplica el mismo criterio que aplicarFiltros fila a fila', () => {
     const filtros: Filtro[] = [{ col: 1, tipo: 'valores', valores: ['Activo'] }]
     expect(rows.map((f) => pasaFiltros(f, filtros))).toEqual([true, true, false, true, false])
+  })
+})
+
+describe('resumenFiltros (cabecera de impresion)', () => {
+  const header = ['Producto', 'Unidades']
+
+  it('sin nada activo devuelve lista vacia', () => {
+    expect(resumenFiltros(header, '', false, [])).toEqual([])
+  })
+
+  it('incluye busqueda, solo activos y filtros por valor', () => {
+    const filtros: Filtro[] = [
+      { col: 0, tipo: 'valores', valores: ['Mesa', 'Silla'] },
+    ]
+    expect(resumenFiltros(header, '  mesa ', true, filtros)).toEqual([
+      'Búsqueda: mesa',
+      'Solo activos',
+      'Producto: Mesa, Silla',
+    ])
+  })
+
+  it('describe el rango con extremos opcionales', () => {
+    const filtros: Filtro[] = [{ col: 1, tipo: 'rango', min: 40 }]
+    expect(resumenFiltros(header, '', false, filtros)).toEqual([
+      'Unidades 40–…',
+    ])
+    const abierto: Filtro[] = [{ col: 1, tipo: 'rango' }]
+    expect(resumenFiltros(header, '', false, abierto)).toEqual([
+      'Unidades …–…',
+    ])
+  })
+
+  it('usa un nombre de respaldo para columnas sin cabecera', () => {
+    const filtros: Filtro[] = [{ col: 7, tipo: 'valores', valores: ['x'] }]
+    expect(resumenFiltros(header, '', false, filtros)).toEqual([
+      'Columna 8: x',
+    ])
   })
 })

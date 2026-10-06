@@ -22,7 +22,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Vista Resumen: 6 KPIs del día + alertas del día, sin tabla | **VERIFICADO** (E2E con capturas) |
 | Scroll del dashboard con rueda y barra siempre visible (fix de app shell) | **VERIFICADO** (E2E: `scrollTop` 0 → 460 con la rueda) |
 | Export .xlsx de la hoja activa con filtros, búsqueda y columnas visibles aplicados | **VERIFICADO** (10 tests + E2E: descarga `easyexcel_demo_Empleados.xlsx` de 9.177 bytes) |
-| Export PDF vía `window.print()` con CSS de impresión (sin chrome, solo lo que ves) | **VERIFICADO** (E2E con `emulateMedia('print')`: sidebar/topbar/toolbar/paginador ocultos) |
+| Export PDF vía `window.print()` con CSS de impresión: cabecera compacta (panel, hoja, fecha, filtros) y **datos en la página 1**; sin banner, copiloto ni KPIs cuando hay tabla | **VERIFICADO** (PDF regenerado con Playwright y auditado con pymupdf: 2 páginas, cero páginas vacías y cero texto de paja) |
 | Menú "Exportar" (Excel/PDF) en topbar y toolbar, con estado "Generando…" y Excel deshabilitado en Resumen | **VERIFICADO** (6 tests de UI + E2E) |
 | Menú de filtro de columna en portal `body` (no se recorta con pocas filas) | **VERIFICADO** (E2E: `position: fixed`, cabida en viewport con 1 fila) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
@@ -163,8 +163,11 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
      openpyxl (`POST /workbooks/{id}/sheets/{hoja}/export`) y descargado con
      el nombre `{libro}_{hoja}.xlsx`; estado "Generando…" y límites
      server-side de filas, columnas y celdas
-   - Export **PDF** con `window.print()` y CSS de impresión: se ocultan
-     sidebar, topbar, toolbar y paginador, y solo se imprime lo que ves
+   - Export **PDF** con `window.print()` y CSS de impresión: arranca con una
+     cabecera compacta (panel, hoja, fecha y filtros activos) y la tabla en la
+     primera página; se ocultan banner, sidebar, toolbar, paginador, copiloto
+     y (cuando hay tabla) los KPIs y paneles inferiores, sin páginas en
+     blanco. En Resumen imprime su contenido: KPIs, alertas y gráficos
    - Menú "Exportar" (Excel/PDF) en topbar y toolbar; en Resumen (sin tabla)
      solo está habilitado el PDF
    - Pulido: el menú de filtro de columna se sirve en un portal al `body`
