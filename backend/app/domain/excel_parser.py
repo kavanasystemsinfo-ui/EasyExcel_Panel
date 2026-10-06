@@ -3,10 +3,11 @@
 import multiprocessing as mp
 import queue as stdlib_queue
 from datetime import date, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from app.core.config import settings
 from app.errors import (
@@ -130,3 +131,42 @@ def read_rows(path: Path, sheet: str, offset: int, limit: int) -> dict:
         (str(path), sheet, offset, limit),
         settings.parse_timeout_s,
     )
+
+
+# ------------------------------------------------------------------ export
+
+_EXPORT_CELL_LIMIT = 32_767
+
+
+def _export_scalar(value: Any) -> Any:
+    if value is None or isinstance(value, (int, float, bool)):
+        return value
+    text = value if isinstance(value, str) else str(value)
+    return text[:_EXPORT_CELL_LIMIT]
+
+
+def build_export(header: list[str], rows: list[list[Any]]) -> bytes:
+    if not header:
+        raise InvalidWorkbookError("La exportacion necesita al menos una columna")
+    if len(header) > settings.max_columns:
+        raise WorkbookLimitError(f"Maximo {settings.max_columns} columnas por hoja")
+    if len(rows) > settings.max_rows_per_sheet:
+        raise WorkbookLimitError(f"Maximo {settings.max_rows_per_sheet} filas por hoja")
+    if len(rows) * len(header) > settings.max_export_cells:
+        raise WorkbookLimitError(
+            f"Maximo {settings.max_export_cells} celdas por exportacion"
+        )
+    for index, row in enumerate(rows, start=2):
+        if len(row) > len(header):
+            raise WorkbookLimitError(
+                f"La fila {index} tiene {len(row)} valores "
+                f"y la cabecera {len(header)} columnas"
+            )
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append([_export_scalar(cell) for cell in header])
+    for row in rows:
+        sheet.append([_export_scalar(cell) for cell in row])
+    buf = BytesIO()
+    workbook.save(buf)
+    return buf.getvalue()

@@ -794,6 +794,54 @@
   accent-color: var(--primary);
 }
 
+.export-wrap {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-2);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+}
+
+.export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.export-menu button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.export-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.export-menu .material-symbols-outlined {
+  font-size: 16px;
+}
+
 .grid-card {
   border-radius: 0 0 var(--r-lg) var(--r-lg);
   overflow: hidden;
@@ -1505,6 +1553,13 @@
   padding: 8px;
 }
 
+.filter-menu-fixed {
+  position: fixed;
+  right: auto;
+  max-height: min(420px, calc(100vh - 16px));
+  overflow-y: auto;
+}
+
 .filter-buscar {
   width: 100%;
   box-sizing: border-box;
@@ -1744,4 +1799,65 @@
 .alerta-ok {
   color: #15803d;
   background: color-mix(in srgb, #22c55e 11%, transparent);
+}
+
+/* ---------------------------------------------------------------- print */
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .sidebar,
+  .topbar,
+  .toolbar,
+  .banner-actions,
+  .bottom-panels,
+  .grid-foot,
+  .grid-meta,
+  .error,
+  .aviso,
+  .loading,
+  .export-wrap {
+    display: none !important;
+  }
+
+  .app-shell {
+    height: auto;
+    overflow: visible;
+    display: block;
+  }
+
+  .app-main,
+  .app-content {
+    height: auto;
+    overflow: visible;
+    display: block;
+  }
+
+  .grid-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .grid-section,
+  .grid-card,
+  .alertas-card,
+  .kpi-grid,
+  .grid-table tr {
+    break-inside: avoid;
+  }
+
+  .app-content {
+    padding: 0;
+  }
 }

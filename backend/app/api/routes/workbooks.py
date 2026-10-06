@@ -1,8 +1,10 @@
+import re
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, Query, Response, UploadFile
 
-from app.api.schemas import SheetRows, WorkbookListItem, WorkbookOut
+from app.api.schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
 from app.core.config import settings
 from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
 from app.core.storage import WorkbookStorage
@@ -16,6 +18,13 @@ from app.errors import (
 router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 
 ZIP_MAGIC = b"PK\x03\x04"
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _attachment(filename: str) -> str:
+    clean = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", filename)
+    fallback = clean.encode("ascii", "replace").decode("ascii")
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{quote(clean)}'
 
 
 def _storage() -> WorkbookStorage:
@@ -97,6 +106,26 @@ def get_sheet_rows(
         "limit": limit,
         **payload,
     }
+
+
+@router.post("/{workbook_id}/sheets/{sheet_name}/export")
+def export_sheet(
+    workbook_id: str,
+    sheet_name: str,
+    payload: ExportPayload,
+) -> Response:
+    manifest = _get_manifest(workbook_id)
+    sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
+    if sheet_name not in sheet_names:
+        raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
+    content = excel_parser.build_export(payload.header, payload.rows)
+    stem = str(manifest.get("filename", "libro")).rsplit(".", 1)[0] or "libro"
+    name = re.sub(r'[\\/:*?"<>|]', "_", f"{stem}_{sheet_name}.xlsx")
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": _attachment(name)},
+    )
 
 
 @router.delete("/{workbook_id}", status_code=204)

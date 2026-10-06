@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
+  exportSheet,
   getDemo,
   getSheetRows,
   PAGE_SIZE,
@@ -18,6 +19,7 @@ import {
   type WorkbookFull,
 } from './edit'
 import { pasaFiltros, type Filtro } from './filters'
+import { descargarBlob, nombreExport, payloadExport } from './export'
 import { calcularKpis, type SheetData } from './kpis'
 import { buscarEnLibro } from './search'
 import {
@@ -331,6 +333,23 @@ function App() {
 
   const abrirSelector = () => fileRef.current?.click()
 
+  async function exportarExcel() {
+    if (!wb || !hoja || !hojaActiva) return
+    try {
+      const payload = payloadExport(
+        hojaActiva.header,
+        ocultas,
+        pares.map((p) => p.fila),
+      )
+      const blob = await exportSheet(wb.id, hoja, payload)
+      descargarBlob(blob, nombreExport(wb.filename, hoja))
+    } catch (error: unknown) {
+      setRowsError(messageOf(error, 'No se pudo exportar la hoja'))
+    }
+  }
+
+  const exportarPdf = () => window.print()
+
   if (!wb) {
     return (
       <main className="standalone">
@@ -374,6 +393,9 @@ function App() {
           onReset={reset}
           resultados={busquedaGlobal}
           onIrA={irA}
+          exportExcel={seccion !== 'resumen'}
+          onExportExcel={exportarExcel}
+          onExportPdf={exportarPdf}
         />
 
         <div className="app-content">
@@ -462,6 +484,8 @@ function App() {
                 onQuitarFiltro={quitarFiltro}
                 onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
                 onAddCol={anadirColumnaDialogo}
+                onExportExcel={exportarExcel}
+                onExportPdf={exportarPdf}
               />
 
               {hojaActiva ? (

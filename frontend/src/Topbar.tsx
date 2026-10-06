@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import ExportMenu from './ExportMenu'
 
 export type ResultadoGlobal = { hoja: string; fila: number; celda: string }
 
@@ -12,6 +13,9 @@ type Props = {
   onReset: () => void
   resultados?: { total: number; items: ResultadoGlobal[] } | null
   onIrA?: (hoja: string, fila: number) => void
+  exportExcel?: boolean
+  onExportExcel?: () => void | Promise<void>
+  onExportPdf?: () => void
 }
 
 function Topbar({
@@ -24,6 +28,9 @@ function Topbar({
   onReset,
   resultados = null,
   onIrA,
+  exportExcel = true,
+  onExportExcel,
+  onExportPdf,
 }: Props) {
   const [abierto, setAbierto] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -122,17 +129,12 @@ function Topbar({
           </span>
           Asistente IA
         </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled
-          title="Exportación: Fase 5"
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            download
-          </span>
-          Exportar
-        </button>
+        <ExportMenu
+          modo="btn"
+          excel={exportExcel}
+          onExcel={() => onExportExcel?.()}
+          onPdf={() => onExportPdf?.()}
+        />
         <button type="button" className="btn btn-primary" onClick={onUploadClick}>
           Cargar .xlsx
         </button>

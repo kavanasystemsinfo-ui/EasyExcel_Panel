@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     max_sheets: int = 50
     max_columns: int = 200
     max_rows_per_sheet: int = 100_000
+    max_export_cells: int = 2_000_000
     parse_timeout_s: float = 5.0
     upload_dir: Path = BACKEND_DIR / "data" / "uploads"
 

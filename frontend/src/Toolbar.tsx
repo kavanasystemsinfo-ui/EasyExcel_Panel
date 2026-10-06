@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Filtro } from './filters'
+import ExportMenu from './ExportMenu'
 
 type Props = {
   header: string[]
@@ -13,6 +14,8 @@ type Props = {
   onQuitarFiltro?: (col: number) => void
   onAddRow: () => void
   onAddCol: () => void
+  onExportExcel: () => void | Promise<void>
+  onExportPdf: () => void
 }
 
 function Toolbar({
@@ -27,6 +30,8 @@ function Toolbar({
   onQuitarFiltro,
   onAddRow,
   onAddCol,
+  onExportExcel,
+  onExportPdf,
 }: Props) {
   const [colsAbiertas, setColsAbiertas] = useState(false)
   const colsRef = useRef<HTMLDivElement>(null)
@@ -60,7 +65,7 @@ function Toolbar({
 
       {coincidencias !== null ? (
         <span className="toolbar-info">
-          {coincidencias} coincidencia{coincidencias === 1 ? '' : 's'} en la página
+          {coincidencias} coincidencia{coincidencias === 1 ? '' : 's'}
         </span>
       ) : null}
 
@@ -127,12 +132,7 @@ function Toolbar({
         ) : null}
       </div>
 
-      <button type="button" className="chip" disabled title="Exportación: Fase 5">
-        <span className="material-symbols-outlined" aria-hidden="true">
-          download
-        </span>
-        Exportar
-      </button>
+      <ExportMenu modo="chip" excel onExcel={onExportExcel} onPdf={onExportPdf} />
       <span className="toolbar-hint">Doble clic en una celda para editarla</span>
     </div>
   )

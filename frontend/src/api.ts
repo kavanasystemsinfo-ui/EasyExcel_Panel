@@ -25,18 +25,20 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 
+async function errorDe(response: Response): Promise<Error> {
+  let detail = `Error HTTP ${response.status}`
+  try {
+    const body = (await response.json()) as { detail?: string }
+    if (body.detail) detail = body.detail
+  } catch {
+    // sin cuerpo JSON: nos quedamos con el status
+  }
+  return new Error(detail)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, init)
-  if (!response.ok) {
-    let detail = `Error HTTP ${response.status}`
-    try {
-      const body = (await response.json()) as { detail?: string }
-      if (body.detail) detail = body.detail
-    } catch {
-      // sin cuerpo JSON: nos quedamos con el status
-    }
-    throw new Error(detail)
-  }
+  if (!response.ok) throw await errorDe(response)
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
@@ -66,4 +68,22 @@ export function deleteWorkbook(workbookId: string): Promise<void> {
 
 export function getDemo(): Promise<Workbook> {
   return request<Workbook>('/api/v1/workbooks/demo')
+}
+
+export async function exportSheet(
+  workbookId: string,
+  sheet: string,
+  payload: { header: string[]; rows: (string | number | boolean | null)[][] },
+): Promise<Blob> {
+  const sheetPath = encodeURIComponent(sheet)
+  const response = await fetch(
+    `${BASE}/api/v1/workbooks/${workbookId}/sheets/${sheetPath}/export`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  )
+  if (!response.ok) throw await errorDe(response)
+  return response.blob()
 }

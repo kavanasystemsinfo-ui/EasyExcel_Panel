@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   esColumnaEstado,
   esColumnaId,
@@ -116,8 +117,11 @@ function GridView({
   }
 
   const [filtroCol, setFiltroCol] = useState<number | null>(null)
+  const [filtroPos, setFiltroPos] = useState<{ top: number; left: number } | null>(null)
   const [buscadorFiltro, setBuscadorFiltro] = useState('')
   const filtroRef = useRef<HTMLDivElement>(null)
+  const filtroBtnRef = useRef<HTMLElement | null>(null)
+  const filtroMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (edicion) inputRef.current?.focus()
@@ -126,17 +130,34 @@ function GridView({
   useEffect(() => {
     if (filtroCol === null) return
     function fuera(event: MouseEvent) {
-      if (filtroRef.current && !filtroRef.current.contains(event.target as Node)) {
-        setFiltroCol(null)
-      }
+      const objetivo = event.target as Node
+      if (filtroRef.current?.contains(objetivo)) return
+      if (filtroMenuRef.current?.contains(objetivo)) return
+      setFiltroCol(null)
+    }
+    function refrescar() {
+      const rect = filtroBtnRef.current?.getBoundingClientRect()
+      if (rect) setFiltroPos({ top: rect.bottom + 6, left: rect.left })
     }
     document.addEventListener('mousedown', fuera)
-    return () => document.removeEventListener('mousedown', fuera)
+    window.addEventListener('scroll', refrescar, true)
+    window.addEventListener('resize', refrescar)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      window.removeEventListener('scroll', refrescar, true)
+      window.removeEventListener('resize', refrescar)
+    }
   }, [filtroCol])
 
-  function abrirFiltro(col: number) {
+  function abrirFiltro(col: number, event: ReactMouseEvent<HTMLButtonElement>) {
     setBuscadorFiltro('')
-    setFiltroCol((actual) => (actual === col ? null : col))
+    const abrir = filtroCol !== col
+    setFiltroCol(abrir ? col : null)
+    if (abrir) {
+      filtroBtnRef.current = event.currentTarget
+      const rect = event.currentTarget.getBoundingClientRect()
+      setFiltroPos({ top: rect.bottom + 6, left: rect.left })
+    }
   }
 
   function filtroDe(col: number): Filtro | undefined {
@@ -233,14 +254,25 @@ function GridView({
                           className={`th-filter-btn${filtro ? ' is-on' : ''}`}
                           aria-label={`Filtrar por ${header[i]}`}
                           aria-expanded={filtroCol === i}
-                          onClick={() => abrirFiltro(i)}
+                          onClick={(event) => abrirFiltro(i, event)}
                         >
                           <span className="material-symbols-outlined" aria-hidden="true">
                             filter_alt
                           </span>
                         </button>
-                        {filtroCol === i ? (
-                          <div className="filter-menu" role="group" aria-label={`Filtro de ${header[i]}`}>
+                        {filtroCol === i
+                          ? createPortal(
+                              <div
+                                ref={filtroMenuRef}
+                                className="filter-menu filter-menu-fixed"
+                                role="group"
+                                aria-label={`Filtro de ${header[i]}`}
+                                style={
+                                  filtroPos
+                                    ? { top: filtroPos.top, left: filtroPos.left }
+                                    : undefined
+                                }
+                              >
                             {esColumnaNumerica(datosMenu, i) ? (
                               <div className="filter-rango">
                                 <label>
@@ -299,8 +331,10 @@ function GridView({
                             >
                               Limpiar
                             </button>
-                          </div>
-                        ) : null}
+                              </div>,
+                              document.body,
+                            )
+                          : null}
                       </span>
                     ) : null}
                   </th>

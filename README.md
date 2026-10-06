@@ -8,19 +8,23 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 4 (vistas, filtros, búsqueda y gráficos)
+## Estado actual: Fase 5 (exportación y pulido)
 
 | Componente | Estado |
 |---|---|
 | Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
 | Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
 | Excel en la nube de solo lectura | **DESPLEGADO** |
-| API de workbooks: carga, listado, detalle, filas, borrado y demo (6 endpoints) | **VERIFICADO** (20 tests + smoke con el dataset real) |
+| API de workbooks: carga, listado, detalle, filas, borrado, demo y export (7 endpoints) | **VERIFICADO** (30 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (112 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (128 tests Vitest) |
 | Navegación por 4 vistas (Resumen, Personal, Operaciones, Datos) con KPIs, gráficos y hojas por dominio | **VERIFICADO** (tests de `views.ts` + E2E de navegación) |
 | Vista Resumen: 6 KPIs del día + alertas del día, sin tabla | **VERIFICADO** (E2E con capturas) |
 | Scroll del dashboard con rueda y barra siempre visible (fix de app shell) | **VERIFICADO** (E2E: `scrollTop` 0 → 460 con la rueda) |
+| Export .xlsx de la hoja activa con filtros, búsqueda y columnas visibles aplicados | **VERIFICADO** (10 tests + E2E: descarga `easyexcel_demo_Empleados.xlsx` de 9.177 bytes) |
+| Export PDF vía `window.print()` con CSS de impresión (sin chrome, solo lo que ves) | **VERIFICADO** (E2E con `emulateMedia('print')`: sidebar/topbar/toolbar/paginador ocultos) |
+| Menú "Exportar" (Excel/PDF) en topbar y toolbar, con estado "Generando…" y Excel deshabilitado en Resumen | **VERIFICADO** (6 tests de UI + E2E) |
+| Menú de filtro de columna en portal `body` (no se recorta con pocas filas) | **VERIFICADO** (E2E: `position: fixed`, cabida en viewport con 1 fila) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
 | Paneles Cobertura por centro (en Operaciones) y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
 | Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |
@@ -32,7 +36,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Vista persistente (sección, hoja, filtros, búsqueda, página) en la sesión | **VERIFICADO** (tests de sesión + E2E tras recarga) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| IA real, exportación, multiusuario | No implementado aún |
+| IA real y multiusuario | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
 (React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker), la persistencia
@@ -153,7 +157,19 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
      restauran al recargar
    - Corregido el scroll del dashboard: el marco ya no recorta el contenido
      (la rueda del ratón desplaza y la barra deslizante es siempre visible)
-5. **Fase 5** — Exportación PDF/Excel y pulido de UI
+5. **Fase 5** — Exportación PDF/Excel y pulido de UI ✅
+   - Export **.xlsx** de la hoja activa con lo que se ve aplicado (filtros,
+     búsqueda, solo activos y columnas visibles), generado por el backend con
+     openpyxl (`POST /workbooks/{id}/sheets/{hoja}/export`) y descargado con
+     el nombre `{libro}_{hoja}.xlsx`; estado "Generando…" y límites
+     server-side de filas, columnas y celdas
+   - Export **PDF** con `window.print()` y CSS de impresión: se ocultan
+     sidebar, topbar, toolbar y paginador, y solo se imprime lo que ves
+   - Menú "Exportar" (Excel/PDF) en topbar y toolbar; en Resumen (sin tabla)
+     solo está habilitado el PDF
+   - Pulido: el menú de filtro de columna se sirve en un portal al `body`
+     (con una o dos filas ya no queda recortado) y el contador de búsqueda
+     muestra el total filtrado sin el texto incorrecto "en la página"
 6. **Fase 6** — Autenticación y multiusuario (opcional)
 7. **Fase 7** — Docker, despliegue y documentación final
 

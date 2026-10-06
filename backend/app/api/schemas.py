@@ -26,3 +26,8 @@ class SheetRows(BaseModel):
     total: int = Field(description="Filas de datos disponibles (sin la cabecera)")
     offset: int
     limit: int
+
+
+class ExportPayload(BaseModel):
+    header: list[str]
+    rows: list[list[str | int | float | bool | None]]
