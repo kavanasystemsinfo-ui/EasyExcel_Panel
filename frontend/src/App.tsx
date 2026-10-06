@@ -20,6 +20,14 @@ import {
 import { pasaFiltros, type Filtro } from './filters'
 import { calcularKpis, type SheetData } from './kpis'
 import { buscarEnLibro } from './search'
+import {
+  ES_SECCION,
+  graficosDeSeccion,
+  hojasDeSeccion,
+  kpisDeSeccion,
+  type Seccion,
+} from './views'
+import Alertas from './Alertas'
 import CoveragePanel from './CoveragePanel'
 import ChartsPanel from './ChartsPanel'
 import CopilotPanel from './CopilotPanel'
@@ -76,17 +84,19 @@ function App() {
   const [ocultas, setOcultas] = useState<number[]>([])
   const [filtros, setFiltros] = useState<Filtro[]>([])
   const [destacada, setDestacada] = useState<number | null>(null)
+  const [seccion, setSeccion] = useState<Seccion>('resumen')
   const [hoy] = useState(() => new Date())
   const fileRef = useRef<HTMLInputElement>(null)
   const wbRef = useRef<WorkbookFull | null>(null)
   const destacadaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function instalar(completo: WorkbookFull) {
+  function instalar(completo: WorkbookFull, destino: Seccion = 'resumen') {
     const tok = nuevoToken()
     wbRef.current = completo
     setWb(completo)
     setToken(tok)
     setCambios(0)
+    setSeccion(destino)
     setHoja(completo.hojas[0]?.name ?? null)
     setPagina(0)
     setQuery('')
@@ -128,13 +138,20 @@ function App() {
       setToken(sesion.token)
       setCambios(sesion.cambios)
       const vista = sesion.vista
-      const hojaValida =
-        vista?.hoja && sesion.wb.hojas.some((h) => h.name === vista.hoja)
-      setHoja(hojaValida ? vista.hoja : (sesion.wb.hojas[0]?.name ?? null))
+      const seccionOk: Seccion =
+        vista?.seccion && ES_SECCION(vista.seccion) ? vista.seccion : 'resumen'
+      const nombres = sesion.wb.hojas.map((h) => h.name)
+      const visibles = hojasDeSeccion(seccionOk, nombres)
+      const hojaOk =
+        vista?.hoja &&
+        nombres.includes(vista.hoja) &&
+        (seccionOk === 'resumen' || visibles.includes(vista.hoja))
+      setSeccion(seccionOk)
+      setHoja(hojaOk ? vista.hoja : (visibles[0] ?? nombres[0] ?? null))
       setQuery(vista?.query ?? '')
       setSoloActivos(vista?.soloActivos ?? false)
       setOcultas(vista?.ocultas ?? [])
-      const headerActiva = hojaValida
+      const headerActiva = hojaOk
         ? sesion.wb.hojas.find((h) => h.name === vista.hoja)?.header ?? []
         : []
       setFiltros(
@@ -156,9 +173,9 @@ function App() {
     if (!sesion || sesion.token !== token) return
     guardarSesion({
       ...sesion,
-      vista: { hoja, query, soloActivos, ocultas, filtros, pagina },
+      vista: { seccion, hoja, query, soloActivos, ocultas, filtros, pagina },
     })
-  }, [token, wb, hoja, query, soloActivos, ocultas, filtros, pagina])
+  }, [token, wb, seccion, hoja, query, soloActivos, ocultas, filtros, pagina])
 
   function persistir(completo: WorkbookFull, tok: string, numCambios: number) {
     const ok = guardarSesion({
@@ -194,7 +211,7 @@ function App() {
     try {
       const manifest = await uploadWorkbook(file)
       borrarSesion()
-      instalar(await cargarHojas(manifest))
+      instalar(await cargarHojas(manifest), 'datos')
     } catch (error: unknown) {
       setUploadError(messageOf(error, 'No se pudo cargar el archivo'))
     } finally {
@@ -260,6 +277,14 @@ function App() {
   }, [wb, query])
 
   const filtrando = Boolean(query.trim()) || (soloActivos && conEstado) || filtros.length > 0
+  const nombresHojas = wb ? wb.hojas.map((h) => h.name) : []
+  const hojasVisibles = hojasDeSeccion(seccion, nombresHojas)
+  const sheetsSelector = (wb?.hojas ?? [])
+    .filter((h) => hojasVisibles.includes(h.name))
+    .sort((a, b) => hojasVisibles.indexOf(a.name) - hojasVisibles.indexOf(b.name))
+    .map((h) => ({ name: h.name, rows: h.rows.length, cols: h.header.length }))
+  const kpisSeccion = kpisDeSeccion(seccion)
+  const graficosSeccion = graficosDeSeccion(seccion, graficos)
 
   function seleccionarHoja(name: string) {
     setHoja(name)
@@ -270,7 +295,17 @@ function App() {
     setRowsError(null)
   }
 
+  function cambiarSeccion(siguiente: Seccion) {
+    setSeccion(siguiente)
+    const nombres = wb?.hojas.map((h) => h.name) ?? []
+    const visibles = hojasDeSeccion(siguiente, nombres)
+    if (siguiente !== 'resumen' && visibles.length && !visibles.includes(hoja ?? '')) {
+      seleccionarHoja(visibles[0])
+    }
+  }
+
   function irA(hojaDestino: string, fila: number) {
+    setSeccion('datos')
     seleccionarHoja(hojaDestino)
     setPagina(Math.floor(fila / PAGE_SIZE) * PAGE_SIZE)
     setDestacada(fila)
@@ -319,7 +354,14 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar wb={wb} active={hoja} onSelect={seleccionarHoja} onReset={reset} />
+      <Sidebar
+        wb={wb}
+        seccion={seccion}
+        onSeccion={cambiarSeccion}
+        active={hoja}
+        onSelect={seleccionarHoja}
+        onReset={reset}
+      />
 
       <div className="app-main">
         <Topbar
@@ -382,81 +424,85 @@ function App() {
             </p>
           ) : null}
 
-          <KpiCards kpis={kpis} />
+          <KpiCards kpis={kpis} solo={kpisSeccion} />
 
-          <section className="grid-section">
-            <div className="grid-head">
-              <SheetSelector
-                sheets={wb.hojas.map((h) => ({
-                  name: h.name,
-                  rows: h.rows.length,
-                  cols: h.header.length,
-                }))}
-                active={hoja ?? ''}
-                onSelect={seleccionarHoja}
-              />
-              <span className="grid-meta">
-                {hojaActiva ? `${hojaActiva.rows.length} filas · edita en local` : 'Cargando hoja…'}
-              </span>
-            </div>
+          {seccion === 'resumen' ? (
+            <Alertas kpis={kpis} />
+          ) : (
+            <section className="grid-section">
+              <div className="grid-head">
+                <SheetSelector
+                  sheets={sheetsSelector}
+                  active={hoja ?? ''}
+                  onSelect={seleccionarHoja}
+                />
+                <span className="grid-meta">
+                  {hojaActiva
+                    ? `${hojaActiva.rows.length} filas · edita en local`
+                    : 'Cargando hoja…'}
+                </span>
+              </div>
 
-            <Toolbar
-              header={hojaActiva?.header ?? []}
-              mostrarChipActivos={conEstado}
-              soloActivos={soloActivos}
-              onSoloActivos={() => {
-                setSoloActivos((on) => !on)
-                setPagina(0)
-              }}
-              ocultas={ocultas}
-              onToggleCol={(i) =>
-                setOcultas((prev) =>
-                  prev.includes(i) ? prev.filter((n) => n !== i) : [...prev, i],
-                )
-              }
-              coincidencias={query.trim() ? pares.length : null}
-              filtros={filtros}
-              onQuitarFiltro={quitarFiltro}
-              onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
-              onAddCol={anadirColumnaDialogo}
-            />
-
-            {hojaActiva ? (
-              <GridView
-                sheetName={hojaActiva.name}
-                header={hojaActiva.header}
-                rows={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.fila)}
-                rowIds={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.i)}
-                total={pares.length}
-                offset={pagina}
-                limit={PAGE_SIZE}
-                onPage={(nueva) => {
-                  setRowsError(null)
-                  setPagina(nueva)
-                }}
-                hiddenCols={ocultas}
-                filtered={filtrando}
-                allRows={hojaActiva.rows}
-                filtros={filtros}
-                onFiltros={(nuevos) => {
-                  setFiltros(nuevos)
+              <Toolbar
+                header={hojaActiva?.header ?? []}
+                mostrarChipActivos={conEstado}
+                soloActivos={soloActivos}
+                onSoloActivos={() => {
+                  setSoloActivos((on) => !on)
                   setPagina(0)
                 }}
-                highlight={destacada}
-                onEdit={(fila, col, valor) =>
-                  aplicar((w) => editarCelda(w, hoja ?? '', fila, col, valor))
+                ocultas={ocultas}
+                onToggleCol={(i) =>
+                  setOcultas((prev) =>
+                    prev.includes(i) ? prev.filter((n) => n !== i) : [...prev, i],
+                  )
                 }
-                onDeleteRow={(fila) => aplicar((w) => borrarFila(w, hoja ?? '', fila))}
+                coincidencias={query.trim() ? pares.length : null}
+                filtros={filtros}
+                onQuitarFiltro={quitarFiltro}
+                onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
+                onAddCol={anadirColumnaDialogo}
               />
-            ) : (
-              <p className="loading">Cargando hoja…</p>
-            )}
-          </section>
+
+              {hojaActiva ? (
+                <GridView
+                  sheetName={hojaActiva.name}
+                  header={hojaActiva.header}
+                  rows={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.fila)}
+                  rowIds={pares.slice(pagina, pagina + PAGE_SIZE).map((p) => p.i)}
+                  total={pares.length}
+                  offset={pagina}
+                  limit={PAGE_SIZE}
+                  onPage={(nueva) => {
+                    setRowsError(null)
+                    setPagina(nueva)
+                  }}
+                  hiddenCols={ocultas}
+                  filtered={filtrando}
+                  allRows={hojaActiva.rows}
+                  filtros={filtros}
+                  onFiltros={(nuevos) => {
+                    setFiltros(nuevos)
+                    setPagina(0)
+                  }}
+                  highlight={destacada}
+                  onEdit={(fila, col, valor) =>
+                    aplicar((w) => editarCelda(w, hoja ?? '', fila, col, valor))
+                  }
+                  onDeleteRow={(fila) => aplicar((w) => borrarFila(w, hoja ?? '', fila))}
+                />
+              ) : (
+                <p className="loading">Cargando hoja…</p>
+              )}
+            </section>
+          )}
 
           <section className="bottom-panels">
             <CopilotPanel />
-            {graficos.length ? <ChartsPanel graficos={graficos} /> : null}
-            {kpis.cobertura?.length ? <CoveragePanel cobertura={kpis.cobertura} /> : null}
+            {seccion === 'operaciones' && kpis.cobertura?.length ? (
+              <CoveragePanel cobertura={kpis.cobertura} />
+            ) : null}
+            {graficosSeccion.length ? <ChartsPanel graficos={graficosSeccion} /> : null}
           </section>
         </div>
       </div>

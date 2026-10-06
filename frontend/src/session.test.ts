@@ -69,6 +69,7 @@ describe('sesion local', () => {
 
   it('conserva la vista opcional (filtros, hoja y pagina)', () => {
     const vista: Vista = {
+      seccion: 'operaciones',
       hoja: 'Ventas',
       query: 'sara',
       soloActivos: true,
@@ -80,6 +81,24 @@ describe('sesion local', () => {
     const cargada = cargarSesion()
     expect(cargada?.vista).toEqual(vista)
     expect(cargada?.cambios).toBe(0)
+  })
+
+  it('funciona sin seccion (sesiones antiguas)', () => {
+    guardarSesion({
+      token: 'tok-s2',
+      cambios: 0,
+      wb,
+      guardadoEn: 'x',
+      vista: {
+        hoja: 'Empleados',
+        query: '',
+        soloActivos: false,
+        ocultas: [],
+        filtros: [],
+        pagina: 0,
+      },
+    })
+    expect(cargarSesion()?.vista?.seccion).toBeUndefined()
   })
 
   it('funciona sin vista (sesiones antiguas)', () => {

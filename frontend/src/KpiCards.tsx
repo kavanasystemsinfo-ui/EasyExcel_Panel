@@ -1,6 +1,6 @@
 import type { Kpis } from './kpis'
 
-type Props = { kpis: Kpis }
+type Props = { kpis: Kpis; solo?: string[] | null }
 
 type Tarjeta = {
   key: string
@@ -140,13 +140,13 @@ function tarjetas(k: Kpis): Tarjeta[] {
   return out
 }
 
-function KpiCards({ kpis }: Props) {
-  const tarjetasVisibles = tarjetas(kpis)
-  if (!tarjetasVisibles.length) return null
+function KpiCards({ kpis, solo = null }: Props) {
+  const visibles = tarjetas(kpis).filter((card) => !solo || solo.includes(card.key))
+  if (!visibles.length) return null
 
   return (
     <section className="kpi-grid" aria-label="Indicadores">
-      {tarjetasVisibles.map((card) => (
+      {visibles.map((card) => (
         <article key={card.key} className="kpi-card">
           <div className="kpi-top">
             <p className="kpi-overline">{card.overline}</p>

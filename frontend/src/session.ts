@@ -1,9 +1,11 @@
 import type { WorkbookFull } from './edit'
 import type { Filtro } from './filters'
+import type { Seccion } from './views'
 
 export const CLAVE_SESION = 'easyexcel:sesion:v1'
 
 export type Vista = {
+  seccion?: Seccion
   hoja: string | null
   query: string
   soloActivos: boolean

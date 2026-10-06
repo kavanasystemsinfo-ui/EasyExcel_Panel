@@ -106,29 +106,69 @@ describe('App con demo automatica (Fase 3)', () => {
     return fetchMock
   }
 
-  it('carga el demo al entrar sin subir nada', async () => {
+  it('carga el demo al entrar sin subir nada, en la vista Resumen', async () => {
     const fetchMock = mockDemo()
     render(<App />)
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workbooks/demo', undefined)
+    expect(screen.queryByTestId('upload-zone')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Alertas del día' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
+  })
+
+  it('navega a la seccion Datos y ahi aparece el grid', async () => {
+    mockDemo()
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Datos' }))
     await waitFor(() =>
       expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
     )
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workbooks/demo', undefined)
-    expect(screen.getByText(/Sesión local/)).toBeInTheDocument()
-    expect(screen.queryByTestId('upload-zone')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Datos' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('tab', { name: /Ventas/ })).toBeInTheDocument()
+  })
+
+  it('la subida de un archivo propio aterriza en la vista Datos', async () => {
+    const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url)
+      if (href.endsWith('/api/v1/workbooks') && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse(workbook, 201))
+      }
+      if (href.includes('/sheets/Ventas/rows')) {
+        return Promise.resolve(jsonResponse(sheetRows))
+      }
+      return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+    const input = screen.getByLabelText(/archivo excel/i)
+    const file = new File(['x'], 'demo.xlsx', { type: 'application/octet-stream' })
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('heading', { name: 'Alertas del día' })).not.toBeInTheDocument()
   })
 
   it('restablecer recarga el demo desde el servidor', async () => {
     const fetchMock = mockDemo()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<App />)
-    await waitFor(() =>
-      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
     const demoCalls = () =>
       fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/workbooks/demo')).length
     expect(demoCalls()).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: /restablecer/i }))
     await waitFor(() => expect(demoCalls()).toBe(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Datos' }))
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
+    )
   })
 })
 

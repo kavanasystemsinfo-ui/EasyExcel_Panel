@@ -1,7 +1,10 @@
 import type { WorkbookFull } from './edit'
+import { SECCIONES, type Seccion } from './views'
 
 type Props = {
   wb: WorkbookFull
+  seccion: Seccion
+  onSeccion: (seccion: Seccion) => void
   active: string | null
   onSelect: (name: string) => void
   onReset: () => void
@@ -19,7 +22,7 @@ function formatSincronizado(value: string): string {
   })
 }
 
-function Sidebar({ wb, active, onSelect, onReset }: Props) {
+function Sidebar({ wb, seccion, onSeccion, active, onSelect, onReset }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -50,24 +53,47 @@ function Sidebar({ wb, active, onSelect, onReset }: Props) {
         </button>
       </div>
 
-      <nav className="ws" aria-label="Hojas del libro">
-        <p className="ws-title">ESPACIOS DE TRABAJO</p>
+      <nav className="secciones" aria-label="Secciones">
+        <p className="ws-title">VISTAS</p>
         <ul>
-          {wb.hojas.map((sheet) => (
-            <li key={sheet.name}>
+          {SECCIONES.map((item) => (
+            <li key={item.id}>
               <button
                 type="button"
-                className={`sheet-item${sheet.name === active ? ' is-active' : ''}`}
-                aria-current={sheet.name === active ? 'page' : undefined}
-                onClick={() => onSelect(sheet.name)}
+                className={`seccion-item${item.id === seccion ? ' is-active' : ''}`}
+                aria-current={item.id === seccion ? 'page' : undefined}
+                onClick={() => onSeccion(item.id)}
               >
-                <span className="sheet-item-name">{sheet.name}</span>
-                <span className="sheet-item-count">{sheet.rows.length}</span>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {item.icono}
+                </span>
+                <span className="seccion-nombre">{item.nombre}</span>
               </button>
             </li>
           ))}
         </ul>
       </nav>
+
+      {seccion === 'datos' ? (
+        <nav className="ws" aria-label="Hojas del libro">
+          <p className="ws-title">ESPACIOS DE TRABAJO</p>
+          <ul>
+            {wb.hojas.map((sheet) => (
+              <li key={sheet.name}>
+                <button
+                  type="button"
+                  className={`sheet-item${sheet.name === active ? ' is-active' : ''}`}
+                  aria-current={sheet.name === active ? 'page' : undefined}
+                  onClick={() => onSelect(sheet.name)}
+                >
+                  <span className="sheet-item-name">{sheet.name}</span>
+                  <span className="sheet-item-count">{sheet.rows.length}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
 
       <div className="side-footer">
         <span className="engine-ok">
