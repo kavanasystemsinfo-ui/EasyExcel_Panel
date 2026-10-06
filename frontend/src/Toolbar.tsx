@@ -8,6 +8,8 @@ type Props = {
   ocultas: number[]
   onToggleCol: (index: number) => void
   coincidencias: number | null
+  onAddRow: () => void
+  onAddCol: () => void
 }
 
 function Toolbar({
@@ -18,6 +20,8 @@ function Toolbar({
   ocultas,
   onToggleCol,
   coincidencias,
+  onAddRow,
+  onAddCol,
 }: Props) {
   const [colsAbiertas, setColsAbiertas] = useState(false)
   const colsRef = useRef<HTMLDivElement>(null)
@@ -57,6 +61,21 @@ function Toolbar({
 
       <span className="toolbar-sep" aria-hidden="true" />
 
+      <button type="button" className="chip" onClick={onAddRow}>
+        <span className="material-symbols-outlined" aria-hidden="true">
+          note_add
+        </span>
+        Nueva fila
+      </button>
+      <button type="button" className="chip" onClick={onAddCol}>
+        <span className="material-symbols-outlined" aria-hidden="true">
+          add_column
+        </span>
+        Nueva columna
+      </button>
+
+      <span className="toolbar-sep" aria-hidden="true" />
+
       <div className="cols-wrap" ref={colsRef}>
         <button
           type="button"
@@ -86,23 +105,13 @@ function Toolbar({
         ) : null}
       </div>
 
-      <button
-        type="button"
-        className="chip"
-        disabled
-        title="Modo edición en celda: Fase 3"
-      >
-        <span className="material-symbols-outlined" aria-hidden="true">
-          edit
-        </span>
-        Edición (F2)
-      </button>
       <button type="button" className="chip" disabled title="Exportación: Fase 5">
         <span className="material-symbols-outlined" aria-hidden="true">
           download
         </span>
         Exportar
       </button>
+      <span className="toolbar-hint">Doble clic en una celda para editarla</span>
     </div>
   )
 }

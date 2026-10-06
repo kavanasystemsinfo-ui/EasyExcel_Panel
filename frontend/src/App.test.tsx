@@ -83,3 +83,52 @@ describe('App', () => {
   })
 })
 
+describe('App con demo automatica (Fase 3)', () => {
+  const manifestDemo = {
+    id: 'd3e0demo000000000000000000000000',
+    filename: 'easyexcel_demo.xlsx',
+    uploaded_at: '2026-10-05T00:00:00+00:00',
+    sheets: [{ name: 'Ventas', rows: 2, cols: 2 }],
+  }
+
+  function mockDemo() {
+    const fetchMock = vi.fn((url: string | URL | Request) => {
+      const href = String(url)
+      if (href.includes('/sheets/Ventas/rows')) {
+        return Promise.resolve(jsonResponse(sheetRows))
+      }
+      if (href.endsWith('/workbooks/demo')) {
+        return Promise.resolve(jsonResponse(manifestDemo))
+      }
+      return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('carga el demo al entrar sin subir nada', async () => {
+    const fetchMock = mockDemo()
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
+    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workbooks/demo', undefined)
+    expect(screen.getByText(/Sesión local/)).toBeInTheDocument()
+    expect(screen.queryByTestId('upload-zone')).not.toBeInTheDocument()
+  })
+
+  it('restablecer recarga el demo desde el servidor', async () => {
+    const fetchMock = mockDemo()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
+    )
+    const demoCalls = () =>
+      fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/workbooks/demo')).length
+    expect(demoCalls()).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: /restablecer/i }))
+    await waitFor(() => expect(demoCalls()).toBe(2))
+  })
+})
+

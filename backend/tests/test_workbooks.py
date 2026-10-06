@@ -194,3 +194,38 @@ def test_timeout_parser_devuelve_422(client, xlsx_2_hojas, monkeypatch):
     monkeypatch.setattr(settings, "parse_timeout_s", 1e-7)
     resp = upload(client, xlsx_2_hojas)
     assert resp.status_code == 422
+
+
+# ------------------------------------------------- demo publico (Fase 3)
+
+
+def test_demo_disponible_y_se_siembra_solo(client):
+    resp = client.get("/api/v1/workbooks/demo")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["filename"] == "easyexcel_demo.xlsx"
+    nombres = [s["name"] for s in body["sheets"]]
+    assert len(nombres) == 10
+    assert "Empleados" in nombres and "Info" in nombres
+    assert body["id"] != "demo"
+
+    otra_vez = client.get("/api/v1/workbooks/demo")
+    assert otra_vez.status_code == 200
+    assert otra_vez.json()["id"] == body["id"]
+
+
+def test_demo_filas_reales(client):
+    resp = client.get("/api/v1/workbooks/demo/sheets/Empleados/rows?limit=5")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 215
+    assert body["header"][:3] == ["ID", "Nombre Completo", "DNI/NIE"]
+
+
+def test_demo_no_se_puede_borrar(client):
+    assert client.get("/api/v1/workbooks/demo").status_code == 200
+    from app.core.demo import DEMO_ID
+
+    assert client.delete("/api/v1/workbooks/demo").status_code == 400
+    assert client.delete(f"/api/v1/workbooks/{DEMO_ID}").status_code == 400
+    assert client.get("/api/v1/workbooks/demo").status_code == 200

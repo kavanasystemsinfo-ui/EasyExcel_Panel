@@ -3,9 +3,20 @@ type Props = {
   query: string
   onQuery: (value: string) => void
   onUploadClick: () => void
+  token: string | null
+  cambios: number
+  onReset: () => void
 }
 
-function Topbar({ sheetCount, query, onQuery, onUploadClick }: Props) {
+function Topbar({
+  sheetCount,
+  query,
+  onQuery,
+  onUploadClick,
+  token,
+  cambios,
+  onReset,
+}: Props) {
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -27,6 +38,29 @@ function Topbar({ sheetCount, query, onQuery, onUploadClick }: Props) {
       </div>
 
       <div className="topbar-right">
+        {token ? (
+          <span className="chip-sesion" title={`Tu espacio de trabajo local: ${token}`}>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              hard_drive
+            </span>
+            Sesión local {token.slice(0, 8)} ·{' '}
+            {cambios === 0
+              ? 'sin cambios'
+              : `${cambios} cambio${cambios === 1 ? '' : 's'}`}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-reset"
+          onClick={onReset}
+          disabled={!token}
+          title="Descartar tus cambios locales y recargar el Excel original"
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            restart_alt
+          </span>
+          Restablecer
+        </button>
         <button
           type="button"
           className="btn btn-ghost"

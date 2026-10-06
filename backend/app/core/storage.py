@@ -30,6 +30,12 @@ class WorkbookStorage:
         self.book_path(wb_id).write_bytes(data)
         return wb_id
 
+    def save_book_as(self, wb_id: str, data: bytes) -> None:
+        if not self.valid_id(wb_id):
+            raise ValueError(f"Id no valido: {wb_id!r}")
+        self._dir(wb_id).mkdir(parents=True, exist_ok=True)
+        self.book_path(wb_id).write_bytes(data)
+
     def finalize(self, wb_id: str, filename: str, sheets: list[dict]) -> dict:
         manifest = {
             "id": wb_id,

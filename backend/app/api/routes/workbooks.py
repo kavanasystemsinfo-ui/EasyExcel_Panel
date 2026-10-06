@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Query, UploadFile
 
 from app.api.schemas import SheetRows, WorkbookListItem, WorkbookOut
 from app.core.config import settings
+from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
 from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
 from app.errors import (
@@ -22,10 +23,20 @@ def _storage() -> WorkbookStorage:
 
 
 def _get_manifest(workbook_id: str) -> dict:
-    manifest = _storage().get(workbook_id)
+    manifest = _storage().get(_resolve_id(workbook_id))
     if manifest is None:
         raise WorkbookNotFoundError(f"El libro '{workbook_id}' no existe")
     return manifest
+
+
+def _resolve_id(workbook_id: str) -> str:
+    if workbook_id != DEMO_ALIAS:
+        return workbook_id
+    if ensure_demo() is None:
+        raise WorkbookNotFoundError(
+            "El libro demo no esta disponible: falta data/easyexcel_demo.xlsx"
+        )
+    return DEMO_ID
 
 
 @router.post("", response_model=WorkbookOut, status_code=201)
@@ -56,6 +67,11 @@ def list_workbooks() -> list[dict]:
     return _storage().list()
 
 
+@router.get("/demo", response_model=WorkbookOut)
+def get_demo() -> dict:
+    return _get_manifest(DEMO_ALIAS)
+
+
 @router.get("/{workbook_id}", response_model=WorkbookOut)
 def get_workbook(workbook_id: str) -> dict:
     return _get_manifest(workbook_id)
@@ -72,7 +88,9 @@ def get_sheet_rows(
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
     if sheet_name not in sheet_names:
         raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
-    payload = excel_parser.read_rows(_storage().book_path(workbook_id), sheet_name, offset, limit)
+    payload = excel_parser.read_rows(
+        _storage().book_path(manifest["id"]), sheet_name, offset, limit
+    )
     return {
         "sheet": sheet_name,
         "offset": offset,
@@ -83,5 +101,7 @@ def get_sheet_rows(
 
 @router.delete("/{workbook_id}", status_code=204)
 def delete_workbook(workbook_id: str) -> None:
+    if workbook_id in {DEMO_ALIAS, DEMO_ID}:
+        raise InvalidWorkbookError("El libro demo es de solo lectura")
     if not _storage().delete(workbook_id):
         raise WorkbookNotFoundError(f"El libro '{workbook_id}' no existe")

@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
+  getDemo,
   getSheetRows,
   PAGE_SIZE,
   uploadWorkbook,
-  type SheetRows,
   type Workbook,
 } from './api'
 import { esColumnaEstado, norm } from './cells'
+import {
+  anadirColumna,
+  anadirFila,
+  borrarFila,
+  editarCelda,
+  hojaDe,
+  type WorkbookFull,
+} from './edit'
 import { calcularKpis, type SheetData } from './kpis'
 import CoveragePanel from './CoveragePanel'
 import CopilotPanel from './CopilotPanel'
@@ -18,115 +26,141 @@ import Sidebar from './Sidebar'
 import Toolbar from './Toolbar'
 import Topbar from './Topbar'
 import UploadZone from './UploadZone'
-
-const HOJAS_KPI = [
-  'Empleados',
-  'Centros',
-  'Asignaciones',
-  'Vacaciones',
-  'Maquinaria',
-  'Auditorias',
-]
-const FILAS_KPI = 500
+import { borrarSesion, cargarSesion, guardarSesion, nuevoToken } from './session'
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+async function cargarHojas(manifest: Workbook): Promise<WorkbookFull> {
+  const hojas = await Promise.all(
+    manifest.sheets.map(async (sheet) => {
+      let header: string[] = []
+      let rows: unknown[][] = []
+      let offset = 0
+      for (;;) {
+        const page = await getSheetRows(manifest.id, sheet.name, offset, 500)
+        header = header.length ? header : page.header
+        rows = rows.concat(page.rows)
+        offset += page.rows.length
+        if (page.rows.length === 0 || offset >= page.total) break
+      }
+      return { name: sheet.name, header, rows }
+    }),
+  )
+  return {
+    id: manifest.id,
+    filename: manifest.filename,
+    uploaded_at: manifest.uploaded_at,
+    hojas,
+  }
+}
+
 function App() {
-  const [workbook, setWorkbook] = useState<Workbook | null>(null)
-  const [sheet, setSheet] = useState<string | null>(null)
-  const [offset, setOffset] = useState(0)
-  const [page, setPage] = useState<SheetRows | null>(null)
-  const [kpisData, setKpisData] = useState<Record<string, SheetData>>({})
+  const [wb, setWb] = useState<WorkbookFull | null>(null)
+  const [token, setToken] = useState<string | null>(null)
+  const [cambios, setCambios] = useState(0)
+  const [hoja, setHoja] = useState<string | null>(null)
+  const [pagina, setPagina] = useState(0)
+  const [demoCargando, setDemoCargando] = useState(true)
   const [busy, setBusy] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [rowsError, setRowsError] = useState<string | null>(null)
-  const [loadingRows, setLoadingRows] = useState(false)
+  const [avisoLocal, setAvisoLocal] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [soloActivos, setSoloActivos] = useState(false)
   const [ocultas, setOcultas] = useState<number[]>([])
   const [hoy] = useState(() => new Date())
   const fileRef = useRef<HTMLInputElement>(null)
+  const wbRef = useRef<WorkbookFull | null>(null)
 
-  useEffect(() => {
-    if (!workbook || !sheet) return
-    let cancelled = false
-    getSheetRows(workbook.id, sheet, offset, PAGE_SIZE)
-      .then((result) => {
-        if (!cancelled) setPage(result)
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) setRowsError(messageOf(error, 'No se pudo leer la hoja'))
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingRows(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [workbook, sheet, offset])
-
-  useEffect(() => {
-    if (!workbook) return
-    const disponibles = HOJAS_KPI.filter((nombre) =>
-      workbook.sheets.some((s) => s.name === nombre),
-    )
-    if (!disponibles.length) return
-    let cancelled = false
-    Promise.all(
-      disponibles.map((nombre) =>
-        getSheetRows(workbook.id, nombre, 0, FILAS_KPI)
-          .then((r) => ({ nombre, r }))
-          .catch(() => null),
-      ),
-    ).then((resultados) => {
-      if (cancelled) return
-      const data: Record<string, SheetData> = {}
-      for (const item of resultados) {
-        if (item) data[item.nombre] = { header: item.r.header, rows: item.r.rows }
-      }
-      setKpisData(data)
+  function instalar(completo: WorkbookFull) {
+    const tok = nuevoToken()
+    wbRef.current = completo
+    setWb(completo)
+    setToken(tok)
+    setCambios(0)
+    setHoja(completo.hojas[0]?.name ?? null)
+    setPagina(0)
+    setQuery('')
+    setSoloActivos(false)
+    setOcultas([])
+    setRowsError(null)
+    guardarSesion({
+      token: tok,
+      cambios: 0,
+      wb: completo,
+      guardadoEn: new Date().toISOString(),
     })
-    return () => {
-      cancelled = true
-    }
-  }, [workbook])
+  }
 
-  const kpis = useMemo(() => calcularKpis(kpisData, hoy), [kpisData, hoy])
-
-  const conEstado = page ? page.header.some((col) => esColumnaEstado(col)) : false
-
-  const rowsFiltradas = useMemo(() => {
-    if (!page) return []
-    let rows = page.rows
-    const texto = norm(query)
-    if (texto) {
-      rows = rows.filter((fila) => fila.some((celda) => norm(celda).includes(texto)))
+  async function iniciarDemo() {
+    setDemoCargando(true)
+    setUploadError(null)
+    try {
+      const manifest = await getDemo()
+      const completo = await cargarHojas(manifest)
+      if (wbRef.current) return
+      instalar(completo)
+    } catch (error: unknown) {
+      if (!wbRef.current) {
+        setUploadError(messageOf(error, 'No se pudo cargar el libro demo'))
+      }
+    } finally {
+      setDemoCargando(false)
     }
-    if (soloActivos && conEstado) {
-      const iEstado = page.header.findIndex((col) => esColumnaEstado(col))
-      rows = rows.filter((fila) => norm(fila[iEstado]) === 'activo')
+  }
+
+  useEffect(() => {
+    const sesion = cargarSesion()
+    if (sesion) {
+      wbRef.current = sesion.wb
+      setWb(sesion.wb)
+      setToken(sesion.token)
+      setCambios(sesion.cambios)
+      setHoja(sesion.wb.hojas[0]?.name ?? null)
+      setDemoCargando(false)
+      return
     }
-    return rows
-  }, [page, query, soloActivos, conEstado])
+    void iniciarDemo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function persistir(completo: WorkbookFull, tok: string, numCambios: number) {
+    const ok = guardarSesion({
+      token: tok,
+      cambios: numCambios,
+      wb: completo,
+      guardadoEn: new Date().toISOString(),
+    })
+    setAvisoLocal(
+      ok ? null : 'Sin espacio en el navegador: los últimos cambios no se han guardado.',
+    )
+  }
+
+  function aplicar(fn: (workbook: WorkbookFull) => WorkbookFull) {
+    if (!wb || !token) return
+    try {
+      const next = fn(wb)
+      const numCambios = cambios + 1
+      setWb(next)
+      setCambios(numCambios)
+      setRowsError(null)
+      persistir(next, token, numCambios)
+    } catch (error: unknown) {
+      setRowsError(messageOf(error, 'No se pudo aplicar el cambio'))
+    }
+  }
 
   const handleFile = async (file: File) => {
     setBusy(true)
     setUploadError(null)
-    setPage(null)
     setRowsError(null)
-    setLoadingRows(false)
-    setOffset(0)
-    setQuery('')
-    setSoloActivos(false)
-    setOcultas([])
-    setKpisData({})
+    setAvisoLocal(null)
     try {
-      const loaded = await uploadWorkbook(file)
-      setWorkbook(loaded)
-      setSheet(loaded.sheets[0]?.name ?? null)
-      setLoadingRows(true)
+      const manifest = await uploadWorkbook(file)
+      borrarSesion()
+      instalar(await cargarHojas(manifest))
     } catch (error: unknown) {
       setUploadError(messageOf(error, 'No se pudo cargar el archivo'))
     } finally {
@@ -135,36 +169,69 @@ function App() {
   }
 
   const reset = () => {
-    setWorkbook(null)
-    setSheet(null)
-    setPage(null)
-    setOffset(0)
-    setUploadError(null)
+    if (
+      !window.confirm(
+        '¿Restablecer el Excel? Se descartarán todos tus cambios locales.',
+      )
+    ) {
+      return
+    }
+    borrarSesion()
+    wbRef.current = null
+    setWb(null)
+    setToken(null)
+    setCambios(0)
     setRowsError(null)
-    setLoadingRows(false)
-    setQuery('')
-    setSoloActivos(false)
-    setOcultas([])
-    setKpisData({})
+    setAvisoLocal(null)
+    void iniciarDemo()
   }
 
-  const goToPage = (newOffset: number) => {
+  const hojaActiva = wb && hoja ? hojaDe(wb, hoja) : null
+  const conEstado = hojaActiva ? hojaActiva.header.some((col) => esColumnaEstado(col)) : false
+
+  const filtradas = useMemo(() => {
+    if (!hojaActiva) return []
+    let rows = hojaActiva.rows
+    const texto = norm(query)
+    if (texto) rows = rows.filter((fila) => fila.some((celda) => norm(celda).includes(texto)))
+    if (soloActivos && conEstado) {
+      const iEstado = hojaActiva.header.findIndex((col) => esColumnaEstado(col))
+      rows = rows.filter((fila) => norm(fila[iEstado]) === 'activo')
+    }
+    return rows
+  }, [hojaActiva, query, soloActivos, conEstado])
+
+  const kpisData = useMemo(() => {
+    const data: Record<string, SheetData> = {}
+    if (!wb) return data
+    for (const h of wb.hojas) data[h.name] = { header: h.header, rows: h.rows }
+    return data
+  }, [wb])
+  const kpis = useMemo(() => calcularKpis(kpisData, hoy), [kpisData, hoy])
+
+  const filtrando = Boolean(query.trim()) || (soloActivos && conEstado)
+
+  function seleccionarHoja(name: string) {
+    setHoja(name)
+    setPagina(0)
+    setOcultas([])
     setRowsError(null)
-    setLoadingRows(true)
-    setOffset(newOffset)
   }
 
-  const seleccionarHoja = (name: string) => {
-    setRowsError(null)
-    setLoadingRows(true)
-    setSheet(name)
-    setOffset(0)
-    setOcultas([])
+  function cambiarQuery(valor: string) {
+    setQuery(valor)
+    setPagina(0)
+  }
+
+  function anadirColumnaDialogo() {
+    const nombre = window.prompt('Nombre de la nueva columna:')
+    if (nombre === null) return
+    aplicar((w) => anadirColumna(w, hoja ?? '', nombre))
   }
 
   const abrirSelector = () => fileRef.current?.click()
 
-  if (!workbook) {
+  if (!wb) {
     return (
       <main className="standalone">
         <header className="brand-head">
@@ -173,7 +240,11 @@ function App() {
           </span>
           <div>
             <h1>EasyExcel Panel</h1>
-            <p>Sube un .xlsx, explora sus hojas y trabaja con sus datos en el navegador.</p>
+            <p>
+              {demoCargando
+                ? 'Cargando el libro demo…'
+                : 'Sube un .xlsx, explora sus hojas y trabaja con sus datos en el navegador.'}
+            </p>
           </div>
         </header>
         <UploadZone onFile={handleFile} busy={busy} error={uploadError} />
@@ -183,14 +254,17 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar workbook={workbook} active={sheet} onSelect={seleccionarHoja} onReset={reset} />
+      <Sidebar wb={wb} active={hoja} onSelect={seleccionarHoja} onReset={reset} />
 
       <div className="app-main">
         <Topbar
-          sheetCount={workbook.sheets.length}
+          sheetCount={wb.hojas.length}
           query={query}
-          onQuery={setQuery}
+          onQuery={cambiarQuery}
           onUploadClick={abrirSelector}
+          token={token}
+          cambios={cambios}
+          onReset={reset}
         />
 
         <div className="app-content">
@@ -199,31 +273,25 @@ function App() {
               <h2>
                 Gestión de Personal y Operaciones
                 <span className="banner-pill">
-                  Corte: {hoy.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  Corte:{' '}
+                  {hoy.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  })}
                 </span>
               </h2>
               <p>
-                Modo demo: {workbook.sheets.length} hoja
-                {workbook.sheets.length === 1 ? '' : 's'} · pulsa un espacio de trabajo para
-                navegar.
+                Modo demo: los cambios se guardan solo en tu navegador — pulsa Restablecer
+                para volver al original.
               </p>
             </div>
             <div className="banner-actions">
-              <button
-                type="button"
-                className="btn btn-onbanner"
-                disabled
-                title="Altas editables: Fase 3"
-              >
-                Nueva Alta Empleado
+              <button type="button" className="btn btn-onbanner" onClick={() => aplicar((w) => anadirFila(w, hoja ?? ''))}>
+                Nueva fila
               </button>
-              <button
-                type="button"
-                className="btn btn-onbanner"
-                disabled
-                title="Asignación editable: Fase 3"
-              >
-                Asignar Turno
+              <button type="button" className="btn btn-onbanner" onClick={anadirColumnaDialogo}>
+                Nueva columna
               </button>
               <button type="button" className="btn btn-primary" onClick={abrirSelector}>
                 Cargar .xlsx
@@ -236,56 +304,76 @@ function App() {
               {uploadError}
             </p>
           ) : null}
+          {rowsError ? (
+            <p role="alert" className="error">
+              {rowsError}
+            </p>
+          ) : null}
+          {avisoLocal ? (
+            <p role="status" className="aviso">
+              {avisoLocal}
+            </p>
+          ) : null}
 
           <KpiCards kpis={kpis} />
 
           <section className="grid-section">
             <div className="grid-head">
               <SheetSelector
-                sheets={workbook.sheets}
-                active={sheet ?? ''}
+                sheets={wb.hojas.map((h) => ({
+                  name: h.name,
+                  rows: h.rows.length,
+                  cols: h.header.length,
+                }))}
+                active={hoja ?? ''}
                 onSelect={seleccionarHoja}
               />
               <span className="grid-meta">
-                {page ? `${page.total} filas · openpyxl` : 'Cargando hoja…'}
+                {hojaActiva ? `${hojaActiva.rows.length} filas · edita en local` : 'Cargando hoja…'}
               </span>
             </div>
 
             <Toolbar
-              header={page?.header ?? []}
+              header={hojaActiva?.header ?? []}
               mostrarChipActivos={conEstado}
               soloActivos={soloActivos}
-              onSoloActivos={() => setSoloActivos((on) => !on)}
+              onSoloActivos={() => {
+                setSoloActivos((on) => !on)
+                setPagina(0)
+              }}
               ocultas={ocultas}
               onToggleCol={(i) =>
                 setOcultas((prev) =>
                   prev.includes(i) ? prev.filter((n) => n !== i) : [...prev, i],
                 )
               }
-              coincidencias={query.trim() ? rowsFiltradas.length : null}
+              coincidencias={query.trim() ? filtradas.length : null}
+              onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
+              onAddCol={anadirColumnaDialogo}
             />
 
-            {rowsError ? (
-              <p role="alert" className="error">
-                {rowsError}
-              </p>
-            ) : null}
-
-            {page && sheet ? (
+            {hojaActiva ? (
               <GridView
-                sheetName={sheet}
-                header={page.header}
-                rows={rowsFiltradas}
-                total={page.total}
-                offset={page.offset}
-                limit={page.limit}
-                onPage={goToPage}
+                sheetName={hojaActiva.name}
+                header={hojaActiva.header}
+                rows={filtradas.slice(pagina, pagina + PAGE_SIZE)}
+                total={filtradas.length}
+                offset={pagina}
+                limit={PAGE_SIZE}
+                onPage={(nueva) => {
+                  setRowsError(null)
+                  setPagina(nueva)
+                }}
                 hiddenCols={ocultas}
-                filtered={Boolean(query.trim()) || (soloActivos && conEstado)}
+                filtered={filtrando}
+                onEdit={(fila, col, valor) =>
+                  aplicar((w) => editarCelda(w, hoja ?? '', fila, col, valor))
+                }
+                onDeleteRow={(fila) => aplicar((w) => borrarFila(w, hoja ?? '', fila))}
               />
-            ) : loadingRows ? (
+            ) : (
               <p className="loading">Cargando hoja…</p>
-            ) : null}
+            )}
           </section>
 
           <section className="bottom-panels">

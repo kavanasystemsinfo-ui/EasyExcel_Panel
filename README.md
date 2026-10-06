@@ -8,26 +8,31 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 2 (carga y visualización)
+## Estado actual: Fase 3 (demo automática y edición local)
 
 | Componente | Estado |
 |---|---|
 | Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
 | Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
 | Excel en la nube de solo lectura | **DESPLEGADO** |
-| API de workbooks: carga, listado, detalle, filas y borrado (5 endpoints) | **VERIFICADO** (17 tests + smoke con el dataset real) |
+| API de workbooks: carga, listado, detalle, filas, borrado y demo (6 endpoints) | **VERIFICADO** (20 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (29 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (53 tests Vitest) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
 | Paneles Cobertura por centro y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
+| Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |
+| Edición libre en cliente: celdas, filas y columnas con persistencia local | **VERIFICADO** (17 tests + E2E: persiste tras recarga) |
+| Sesión local por visitante y botón "Restablecer" al original | **VERIFICADO** (E2E navegador con capturas) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Edición de celdas, gráficos, IA real, exportación | No implementado aún |
+| Gráficos, IA real, exportación, multiusuario | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
-(React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker) y la persistencia
+(React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker), la persistencia
 de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
-(FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas).
+(FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas) y
+la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
+(localStorage por visitante, sin JWT hasta que haya multiusuario).
 
 ### Excel de demo en la nube (solo lectura)
 
@@ -106,8 +111,10 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/core/      configuración y storage (FS + manifest)
   app/domain/    excel_parser (subproceso con timeout)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest)
+  src/edit.ts     motor de edición de hojas (puro, con límites)
+  src/session.ts  sesión local por visitante (localStorage)
 boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
-docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS)
+docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS · 0003: sesión local)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
 .github/   CI: ruff + mypy + pytest · oxlint + vitest + build
@@ -120,7 +127,10 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
    - **UI de dashboard** (sidebar de hojas, 6 tarjetas KPI calculadas del propio .xlsx,
      grid con avatares/estados/paginador numérico, cobertura por centro y copiloto
      pendiente de IA) ✅
-3. **Fase 3** — Edición de celdas y guardado/exportación
+3. **Fase 3** — Demo automática y edición local ✅
+   - Al entrar se carga el libro demo del servidor; cada visitante edita en su
+     navegador (celdas, filas y columnas) con sesión local en `localStorage` y
+     botón "Restablecer" al original (ADR-0003)
 4. **Fase 4** — Filtros, búsqueda y gráficos
 5. **Fase 5** — Exportación PDF/Excel y pulido de UI
 6. **Fase 6** — Autenticación y multiusuario (opcional)

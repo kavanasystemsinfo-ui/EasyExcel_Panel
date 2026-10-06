@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react'
 import {
   esColumnaEstado,
   esColumnaId,
   esColumnaNombre,
   formatCelda,
+  num,
   tonoEstado,
   type Tono,
 } from './cells'
@@ -17,7 +19,11 @@ type Props = {
   onPage: (offset: number) => void
   hiddenCols?: number[]
   filtered?: boolean
+  onEdit?: (fila: number, col: number, valor: unknown) => void
+  onDeleteRow?: (fila: number) => void
 }
+
+type Edicion = { fila: number; col: number; borrador: string; original: unknown }
 
 function iniciales(nombre: string): string {
   return nombre
@@ -56,6 +62,14 @@ function ventanaPaginas(paginas: number, actual: number): (number | 'gap')[] {
   return out
 }
 
+function coerce(borrador: string, original: unknown): unknown {
+  if (typeof original === 'number') {
+    const n = num(borrador)
+    return Number.isFinite(n) ? n : borrador
+  }
+  return borrador
+}
+
 function Badge({ valor }: { valor: unknown }) {
   const tono: Tono = tonoEstado(valor)
   const texto = String(valor ?? '').trim()
@@ -73,14 +87,44 @@ function GridView({
   onPage,
   hiddenCols = [],
   filtered = false,
+  onEdit,
+  onDeleteRow,
 }: Props) {
-  const visibles = header
-    .map((_, i) => i)
-    .filter((i) => !hiddenCols.includes(i))
+  const [edicion, setEdicion] = useState<Edicion | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const claveVista = `${sheetName}:${offset}`
+  const [clavePrevia, setClavePrevia] = useState(claveVista)
+  if (clavePrevia !== claveVista) {
+    setClavePrevia(claveVista)
+    setEdicion(null)
+  }
+
+  useEffect(() => {
+    if (edicion) inputRef.current?.focus()
+  }, [edicion])
+
+  const visibles = header.map((_, i) => i).filter((i) => !hiddenCols.includes(i))
   const iDni = header.findIndex((col) => /\b(dni|nie|nif)\b/i.test(col))
   const paginas = Math.max(1, Math.ceil(total / limit))
   const actual = Math.floor(offset / limit) + 1
   const numeros = ventanaPaginas(paginas, actual)
+
+  function abrir(fila: number, col: number, valor: unknown) {
+    if (!onEdit) return
+    setEdicion({ fila, col, borrador: String(valor ?? ''), original: valor })
+  }
+
+  function confirmar() {
+    if (!edicion || !onEdit) return
+    const valor = coerce(edicion.borrador, edicion.original)
+    const cambio = String(valor ?? '') !== String(edicion.original ?? '')
+    setEdicion(null)
+    if (cambio) onEdit(edicion.fila, edicion.col, valor)
+  }
+
+  function cancelar() {
+    setEdicion(null)
+  }
 
   return (
     <div className="grid-card">
@@ -102,74 +146,106 @@ function GridView({
             </tr>
           </thead>
           <tbody>
-            {rows.map((fila, r) => (
-              <tr key={`${sheetName}-${offset + r}`}>
-                <td className="col-num">{offset + r + 1}</td>
-                {visibles.map((i) => {
-                  const col = header[i]
-                  const value = fila[i]
-                  if (esColumnaNombre(col)) {
+            {rows.map((fila, r) => {
+              const filaGlobal = offset + r
+              return (
+                <tr key={`${sheetName}-${filaGlobal}`}>
+                  <td className="col-num">{filaGlobal + 1}</td>
+                  {visibles.map((i) => {
+                    const col = header[i]
+                    const value = fila[i]
+                    const enEdicion = edicion?.fila === filaGlobal && edicion?.col === i
+                    if (enEdicion) {
+                      return (
+                        <td key={`${col}-${i}`} className="cell-editing">
+                          <input
+                            ref={inputRef}
+                            aria-label={`Editar ${col}`}
+                            value={edicion.borrador}
+                            onChange={(event) =>
+                              setEdicion({ ...edicion, borrador: event.target.value })
+                            }
+                            onBlur={confirmar}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') confirmar()
+                              if (event.key === 'Escape') cancelar()
+                            }}
+                          />
+                        </td>
+                      )
+                    }
+                    if (esColumnaNombre(col)) {
+                      return (
+                        <td
+                          key={`${col}-${i}`}
+                          onDoubleClick={() => abrir(filaGlobal, i, value)}
+                          className={onEdit ? 'cell-editable' : undefined}
+                        >
+                          <span className="cell-name">
+                            <span className="avatar-circle" aria-hidden="true">
+                              {iniciales(String(value ?? ''))}
+                            </span>
+                            <span>
+                              <span className="name-main">{String(value ?? '')}</span>
+                              {iDni >= 0 && iDni !== i ? (
+                                <span className="name-sub">{String(fila[iDni] ?? '')}</span>
+                              ) : null}
+                            </span>
+                          </span>
+                        </td>
+                      )
+                    }
+                    if (esColumnaEstado(col)) {
+                      return (
+                        <td
+                          key={`${col}-${i}`}
+                          onDoubleClick={() => abrir(filaGlobal, i, value)}
+                          className={onEdit ? 'cell-editable' : undefined}
+                        >
+                          <Badge valor={value} />
+                        </td>
+                      )
+                    }
+                    const texto = formatCelda(col, value)
+                    const clase = [
+                      esColumnaId(col) ? 'cell-id' : '',
+                      typeof value === 'number' ? 'cell-num' : '',
+                      onEdit ? 'cell-editable' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')
                     return (
-                      <td key={`${col}-${i}`}>
-                        <span className="cell-name">
-                          <span className="avatar-circle" aria-hidden="true">
-                            {iniciales(String(value ?? ''))}
-                          </span>
-                          <span>
-                            <span className="name-main">{String(value ?? '')}</span>
-                            {iDni >= 0 && iDni !== i ? (
-                              <span className="name-sub">{String(fila[iDni] ?? '')}</span>
-                            ) : null}
-                          </span>
+                      <td
+                        key={`${col}-${i}`}
+                        className={clase}
+                        onDoubleClick={() => abrir(filaGlobal, i, value)}
+                      >
+                        {texto}
+                      </td>
+                    )
+                  })}
+                  <td className="col-actions">
+                    {onDeleteRow ? (
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-danger"
+                        aria-label="Eliminar fila"
+                        title="Eliminar esta fila"
+                        onClick={() => {
+                          if (window.confirm(`¿Eliminar la fila ${filaGlobal + 1}?`)) {
+                            onDeleteRow(filaGlobal)
+                          }
+                        }}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          delete
                         </span>
-                      </td>
-                    )
-                  }
-                  if (esColumnaEstado(col)) {
-                    return (
-                      <td key={`${col}-${i}`}>
-                        <Badge valor={value} />
-                      </td>
-                    )
-                  }
-                  const texto = formatCelda(col, value)
-                  const clase = esColumnaId(col)
-                    ? 'cell-id'
-                    : typeof value === 'number'
-                      ? 'cell-num'
-                      : ''
-                  return (
-                    <td key={`${col}-${i}`} className={clase}>
-                      {texto}
-                    </td>
-                  )
-                })}
-                <td className="col-actions">
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    disabled
-                    title="Editar fila: Fase 3"
-                    aria-label="Editar"
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      edit
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    disabled
-                    title="Ver detalle: pendiente"
-                    aria-label="Ver detalle"
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      visibility
-                    </span>
-                  </button>
-                </td>
-              </tr>
-            ))}
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              )
+            })}
             {rows.length === 0 ? (
               <tr>
                 <td className="grid-empty" colSpan={visibles.length + 2}>

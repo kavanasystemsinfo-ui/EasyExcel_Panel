@@ -1,7 +1,7 @@
-import type { Workbook } from './api'
+import type { WorkbookFull } from './edit'
 
 type Props = {
-  workbook: Workbook
+  wb: WorkbookFull
   active: string | null
   onSelect: (name: string) => void
   onReset: () => void
@@ -19,7 +19,7 @@ function formatSincronizado(value: string): string {
   })
 }
 
-function Sidebar({ workbook, active, onSelect, onReset }: Props) {
+function Sidebar({ wb, active, onSelect, onReset }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -37,8 +37,8 @@ function Sidebar({ workbook, active, onSelect, onReset }: Props) {
           table_view
         </span>
         <div className="archivo-meta">
-          <strong title={workbook.filename}>{workbook.filename}</strong>
-          <span>Sincronizado: {formatSincronizado(workbook.uploaded_at)}</span>
+          <strong title={wb.filename}>{wb.filename}</strong>
+          <span>Sincronizado: {formatSincronizado(wb.uploaded_at)}</span>
         </div>
         <button
           type="button"
@@ -53,7 +53,7 @@ function Sidebar({ workbook, active, onSelect, onReset }: Props) {
       <nav className="ws" aria-label="Hojas del libro">
         <p className="ws-title">ESPACIOS DE TRABAJO</p>
         <ul>
-          {workbook.sheets.map((sheet) => (
+          {wb.hojas.map((sheet) => (
             <li key={sheet.name}>
               <button
                 type="button"
@@ -62,7 +62,7 @@ function Sidebar({ workbook, active, onSelect, onReset }: Props) {
                 onClick={() => onSelect(sheet.name)}
               >
                 <span className="sheet-item-name">{sheet.name}</span>
-                <span className="sheet-item-count">{sheet.rows}</span>
+                <span className="sheet-item-count">{sheet.rows.length}</span>
               </button>
             </li>
           ))}

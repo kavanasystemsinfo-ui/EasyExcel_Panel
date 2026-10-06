@@ -63,3 +63,7 @@ export function getSheetRows(
 export function deleteWorkbook(workbookId: string): Promise<void> {
   return request<void>(`/api/v1/workbooks/${workbookId}`, { method: 'DELETE' })
 }
+
+export function getDemo(): Promise<Workbook> {
+  return request<Workbook>('/api/v1/workbooks/demo')
+}
