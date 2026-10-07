@@ -31,6 +31,7 @@ function jsonResponse(data: unknown, status = 200) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  localStorage.clear()
 })
 
 describe('App', () => {
@@ -172,8 +173,8 @@ describe('App con demo automatica (Fase 3)', () => {
   })
 })
 
-describe('Asistente IA del topbar (Fase 6)', () => {
-  it('esta habilitado y al pulsarlo enfoca el input del copiloto', async () => {
+describe('Asistente IA (Fase 6)', () => {
+  it('vive en la parte superior y se oculta y reabre desde su cabecera', async () => {
     const fetchMock = vi.fn((url: string | URL | Request) => {
       const href = String(url)
       if (href.includes('/sheets/Ventas/rows')) {
@@ -195,12 +196,38 @@ describe('Asistente IA del topbar (Fase 6)', () => {
 
     render(<App />)
     await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
-    const asistente = screen.getByRole('button', { name: /asistente ia/i })
-    expect(asistente).toBeEnabled()
-    const input = screen.getByLabelText(/pregunta al copiloto/i)
-    expect(document.activeElement).not.toBe(input)
-    fireEvent.click(asistente)
-    await waitFor(() => expect(document.activeElement).toBe(input))
+
+    // el topbar ya no lleva su propio boton de asistente
+    expect(document.querySelector('.topbar')?.textContent).not.toMatch(/Asistente IA/)
+
+    // visible arriba: tras el banner y antes de los paneles inferiores
+    const contenido = document.querySelector('.app-content')
+    const copiloto = document.querySelector('.copilot')
+    const banner = document.querySelector('.banner')
+    const paneles = document.querySelector('.bottom-panels')
+    if (!contenido || !copiloto || !banner || !paneles) {
+      throw new Error('faltan nodos del layout')
+    }
+    const hijos = Array.from(contenido.children)
+    expect(hijos.indexOf(copiloto)).toBeGreaterThan(hijos.indexOf(banner))
+    expect(hijos.indexOf(copiloto)).toBeLessThan(hijos.indexOf(paneles))
+    expect(copiloto.closest('.bottom-panels')).toBeNull()
+
+    // se oculta con su cabecera y el panel deja de ocupar sitio
+    const cabecera = screen.getByRole('button', { name: /asistente ia/i })
+    expect(cabecera).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText(/pregunta al copiloto/i)).toBeInTheDocument()
+    fireEvent.click(cabecera)
+    expect(cabecera).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText(/pregunta al copiloto/i)).not.toBeInTheDocument()
+    expect(localStorage.getItem('easyexcel-copiloto')).toBe('cerrado')
+
+    // y se reabre desde la misma cabecera, con la eleccion persistida
+    fireEvent.click(cabecera)
+    expect(cabecera).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText(/pregunta al copiloto/i)).toBeInTheDocument()
+    expect(localStorage.getItem('easyexcel-copiloto')).toBe('abierto')
   })
 })
+
 

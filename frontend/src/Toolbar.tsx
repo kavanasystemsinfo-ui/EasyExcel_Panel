@@ -16,6 +16,8 @@ type Props = {
   onAddCol: () => void
   onExportExcel: () => void | Promise<void>
   onExportPdf: () => void
+  query: string
+  onQuery: (value: string) => void
 }
 
 function Toolbar({
@@ -32,9 +34,13 @@ function Toolbar({
   onAddCol,
   onExportExcel,
   onExportPdf,
+  query,
+  onQuery,
 }: Props) {
   const [colsAbiertas, setColsAbiertas] = useState(false)
+  const [buscando, setBuscando] = useState(false)
   const colsRef = useRef<HTMLDivElement>(null)
+  const mostrandoCampo = buscando || Boolean(query)
 
   useEffect(() => {
     if (!colsAbiertas) return
@@ -96,7 +102,7 @@ function Toolbar({
       </button>
       <button type="button" className="chip" onClick={onAddCol}>
         <span className="material-symbols-outlined" aria-hidden="true">
-          add_column
+          add
         </span>
         Nueva columna
       </button>
@@ -133,6 +139,54 @@ function Toolbar({
       </div>
 
       <ExportMenu modo="chip" excel onExcel={onExportExcel} onPdf={onExportPdf} />
+
+      <span className="toolbar-sep" aria-hidden="true" />
+
+      <button
+        type="button"
+        className={`chip chip-f${query ? ' is-on' : ''}`}
+        aria-label="Buscar dato"
+        aria-pressed={Boolean(query)}
+        onClick={() => {
+          if (query) {
+            onQuery('')
+            setBuscando(false)
+            return
+          }
+          setBuscando((abierto) => !abierto)
+        }}
+      >
+        <span className="chip-f-letra" aria-hidden="true">
+          F
+        </span>
+        Buscar
+      </button>
+      {mostrandoCampo ? (
+        <span className="toolbar-buscar">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            search
+          </span>
+          <input
+            type="text"
+            value={query}
+            placeholder="Buscar cualquier dato…"
+            aria-label="Buscar dato en la hoja"
+            autoFocus
+            onChange={(event) => onQuery(event.target.value)}
+          />
+          {query ? (
+            <button
+              type="button"
+              className="toolbar-buscar-clear"
+              aria-label="Limpiar búsqueda"
+              onClick={() => onQuery('')}
+            >
+              ✕
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+
       <span className="toolbar-hint">Doble clic en una celda para editarla</span>
     </div>
   )

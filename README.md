@@ -8,7 +8,7 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 6 (copiloto IA con modelos gratuitos)
+## Estado actual: Fase 6 (Asistente IA con modelos gratuitos)
 
 | Componente | Estado |
 |---|---|
@@ -17,7 +17,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Excel en la nube de solo lectura | **DESPLEGADO** |
 | API de workbooks: carga, listado, detalle, filas, borrado, demo, export y copiloto (8 endpoints) | **VERIFICADO** (39 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (146 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (158 tests Vitest) |
 | Navegación por 4 vistas (Resumen, Personal, Operaciones, Datos) con KPIs, gráficos y hojas por dominio | **VERIFICADO** (tests de `views.ts` + E2E de navegación) |
 | Vista Resumen: 6 KPIs del día + alertas del día, sin tabla | **VERIFICADO** (E2E con capturas) |
 | Scroll del dashboard con rueda y barra siempre visible (fix de app shell) | **VERIFICADO** (E2E: `scrollTop` 0 → 460 con la rueda) |
@@ -26,7 +26,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Menú "Exportar" (Excel/PDF) en topbar y toolbar, con estado "Generando…" y Excel deshabilitado en Resumen | **VERIFICADO** (6 tests de UI + E2E) |
 | Menú de filtro de columna en portal `body` (no se recorta con pocas filas) | **VERIFICADO** (E2E: `position: fixed`, cabida en viewport con 1 fila) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
-| Paneles Cobertura por centro (en Operaciones) y Copiloto | **VERIFICADO** (E2E navegador con capturas) |
+| Paneles Cobertura por centro (en Operaciones) y Asistente IA (arriba, colapsable, degradado azul) | **VERIFICADO** (E2E navegador con capturas) |
 | Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |
 | Edición libre en cliente: celdas, filas y columnas con persistencia local | **VERIFICADO** (17 tests + E2E: persiste tras recarga) |
 | Sesión local por visitante y botón "Restablecer" al original | **VERIFICADO** (E2E navegador con capturas) |
@@ -36,7 +36,10 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Vista persistente (sección, hoja, filtros, búsqueda, página) en la sesión | **VERIFICADO** (tests de sesión + E2E tras recarga) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Copiloto IA: preguntas en lenguaje natural con contexto anclado (KPIs, alertas, conteos por columna y muestra filtrada), streaming SSE, cadena de respaldo de modelos gratuitos (OpenRouter → NVIDIA), rate limit por IP y caché de preguntas repetidas | **VERIFICADO** (9 tests backend + 14 frontend + E2E real: "¿Cuántos de vacaciones hoy?" → "15 empleados" = `kpis.vacaciones.hoy`, vía `openrouter · cohere/north-mini-code:free`) |
+| Asistente IA: preguntas en lenguaje natural con contexto anclado (KPIs, alertas, conteos por columna y muestra filtrada), streaming SSE, cadena de respaldo de modelos gratuitos (OpenRouter → NVIDIA), rate limit por IP y caché de preguntas repetidas | **VERIFICADO** (10 tests backend + 9 frontend + E2E real: "¿Cuántos de vacaciones hoy?" → "15 empleados" = `kpis.vacaciones.hoy`, vía `openrouter · cohere/north-mini-code:free`) |
+| Panel Asistente IA arriba del todo (tras el banner), con cabecera colapsable (desplegar/ocultar, persistida en `localStorage`) y fondo degradado azul → azul oscuro; sin botón propio en el topbar | **VERIFICADO** (tests de UI + E2E: título, `aria-expanded`, degradado, persistencia) |
+| Botón "F" (Buscar) en la toolbar: abre un campo de búsqueda manual de cualquier dato en la hoja activa; con búsqueda activa queda pulsado y al volver a pulsarla limpia | **VERIFICADO** (4 tests de UI + E2E: 7 → 1 filas con "Bogot" → 7 al limpiar) |
+| Menú de filtro de columna reposicionado para abrir hacia arriba o recortarse cuando no cabe en el viewport (el panel de arriba bajaba la tabla y desbordaba el menú) | **VERIFICADO** (4 tests de posicionamiento + E2E de filtro con recorte) |
 | Auth y multiusuario | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
@@ -46,7 +49,7 @@ de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
 la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
 (sessionStorage por visitante: se restablece al cerrar el navegador, sin JWT hasta que haya multiusuario).
 
-### Copiloto IA (modelos gratuitos)
+### Asistente IA (modelos gratuitos)
 
 `POST /api/v1/copiloto` recibe `{pregunta, contexto}` y responde por **SSE**
 (eventos `delta` → `fin`, o `error`). El proveedor se decide en el servidor:
@@ -61,6 +64,15 @@ la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
   alertas, conteos por columna (máx. 8 columnas categóricas con ≤40 valores) y
   una muestra de 15 filas filtradas; el system prompt prohíbe inventar números
   y manda reproducir los del contexto. Máximo 60.000 caracteres serializados.
+- **Resumen del día**: ante preguntas genéricas ("¿Cómo va el día?", "qué hay que
+  gestionar", "estado general") el system prompt manda responder con (1) estado
+  general del día en una frase con datos concretos, (2) acciones más importantes
+  o urgentes (máx. 3, con su dato y por qué es urgente) y (3) puntos no críticos
+  que requieren atención, ordenados por urgencia.
+- **Sugerencias rápidas**: la primera es "¿Cómo va el día?"; le siguen "¿Qué
+  necesito gestionar hoy?", "¿Qué alertas hay abiertas?", "¿Quién está de
+  vacaciones hoy?", "¿Qué centro tiene más huecos?" y "Muéstrame revisiones
+  vencidas".
 - **Protecciones**: 40 consultas / 10 min por IP, caché de 200 preguntas
   idénticas, `max_tokens` 600 y timeout de 90 s; sin ninguna clave configurada
   responde `503`; logging de cada intento (`easyexcel.copiloto`).

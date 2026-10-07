@@ -16,7 +16,6 @@ type Props = {
   exportExcel?: boolean
   onExportExcel?: () => void | Promise<void>
   onExportPdf?: () => void
-  onAsistente?: () => void
 }
 
 function Topbar({
@@ -32,7 +31,6 @@ function Topbar({
   exportExcel = true,
   onExportExcel,
   onExportPdf,
-  onAsistente,
 }: Props) {
   const [abierto, setAbierto] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -119,17 +117,6 @@ function Topbar({
             restart_alt
           </span>
           Restablecer
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={onAsistente}
-          title="Lleva al copiloto de datos"
-        >
-          <span className="material-symbols-outlined" aria-hidden="true">
-            auto_awesome
-          </span>
-          Asistente IA
         </button>
         <ExportMenu
           modo="btn"

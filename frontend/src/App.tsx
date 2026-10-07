@@ -90,6 +90,9 @@ function App() {
   const [filtros, setFiltros] = useState<Filtro[]>([])
   const [destacada, setDestacada] = useState<number | null>(null)
   const [seccion, setSeccion] = useState<Seccion>('resumen')
+  const [copilotoAbierto, setCopilotoAbierto] = useState(
+    () => localStorage.getItem('easyexcel-copiloto') !== 'cerrado',
+  )
   const [hoy] = useState(() => new Date())
   const fileRef = useRef<HTMLInputElement>(null)
   const wbRef = useRef<WorkbookFull | null>(null)
@@ -335,11 +338,9 @@ function App() {
     setRowsError(null)
   }
 
-  function irAlCopiloto() {
-    const panel = document.querySelector('.copilot')
-    panel?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
-    const input = document.querySelector<HTMLInputElement>('.copilot-input')
-    input?.focus()
+  function guardarCopiloto(estado: 'abierto' | 'cerrado') {
+    setCopilotoAbierto(estado === 'abierto')
+    localStorage.setItem('easyexcel-copiloto', estado)
   }
 
   function cambiarSeccion(siguiente: Seccion) {
@@ -441,7 +442,6 @@ function App() {
           exportExcel={seccion !== 'resumen'}
           onExportExcel={exportarExcel}
           onExportPdf={exportarPdf}
-          onAsistente={irAlCopiloto}
         />
 
         <div className="app-content">
@@ -507,6 +507,14 @@ function App() {
             </p>
           ) : null}
 
+          <CopilotPanel
+            contexto={contextoCopiloto}
+            abierto={copilotoAbierto}
+            onToggle={() =>
+              guardarCopiloto(copilotoAbierto ? 'cerrado' : 'abierto')
+            }
+          />
+
           <KpiCards kpis={kpis} solo={kpisSeccion} />
 
           {seccion === 'resumen' ? (
@@ -541,6 +549,8 @@ function App() {
                   )
                 }
                 coincidencias={query.trim() ? pares.length : null}
+                query={query}
+                onQuery={cambiarQuery}
                 filtros={filtros}
                 onQuitarFiltro={quitarFiltro}
                 onAddRow={() => aplicar((w) => anadirFila(w, hoja ?? ''))}
@@ -583,7 +593,6 @@ function App() {
           )}
 
           <section className="bottom-panels">
-            <CopilotPanel contexto={contextoCopiloto} />
             {seccion === 'operaciones' && kpis.cobertura?.length ? (
               <CoveragePanel cobertura={kpis.cobertura} />
             ) : null}

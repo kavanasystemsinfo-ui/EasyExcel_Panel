@@ -204,6 +204,15 @@ def test_pregunta_y_contexto_llegan_al_modelo(
     assert messages[0]["role"] == "system"
 
 
+def test_prompt_estructura_el_resumen_del_dia() -> None:
+    prompt = assistant.SYSTEM_PROMPT.lower()
+    # la pregunta generica "¿Cómo va el día?" debe recibir un resumen jerarquizado
+    assert "estado general" in prompt
+    assert "urgente" in prompt
+    assert "no crítico" in prompt or "no critico" in prompt
+    assert "atención" in prompt or "atencion" in prompt
+
+
 def test_pregunta_vacia_devuelve_422() -> None:
     response = client.post("/api/v1/copiloto", json={"pregunta": "", "contexto": {}})
     assert response.status_code == 422

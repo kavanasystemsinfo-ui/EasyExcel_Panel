@@ -1079,6 +1079,52 @@
   align-items: center;
 }
 
+.copilot-head {
+  padding: 0;
+}
+
+.copilot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+  text-align: left;
+  border-radius: var(--r);
+}
+
+.copilot-toggle:hover {
+  background: var(--surface-2);
+}
+
+.copilot-titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.copilot-titulo strong {
+  font-size: 14px;
+}
+
+.copilot-titulo small {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.copilot-chevron {
+  font-size: 20px;
+  color: var(--muted);
+}
+
 .copilot-spark {
   width: 34px;
   height: 34px;
@@ -1170,6 +1216,148 @@ button.chip {
   margin: 10px 0 0;
   font-size: 11px;
   color: var(--outline);
+}
+
+/* ===== Asistente IA: degradado azul → azul oscuro ===== */
+.copilot {
+  padding: 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 45%, #0b1e46 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #eef4ff;
+  box-shadow: 0 12px 28px rgba(11, 30, 70, 0.3);
+}
+
+.copilot .copilot-head {
+  margin-bottom: 4px;
+}
+
+.copilot .copilot-toggle {
+  padding: 8px 10px;
+  color: #fff;
+}
+
+.copilot .copilot-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.copilot .copilot-titulo strong {
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.copilot .copilot-titulo small {
+  color: rgba(238, 244, 255, 0.78);
+}
+
+.copilot .copilot-spark {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.copilot .copilot-chevron {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.copilot .badge-ok {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.copilot-input {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.copilot-input:focus {
+  border-color: #93c5fd;
+}
+
+.copilot .btn-primary.copilot-send {
+  background: #fff;
+  border-color: #fff;
+  color: #1e40af;
+}
+
+.copilot .btn-primary.copilot-send:disabled {
+  opacity: 0.6;
+}
+
+.copilot-respuesta {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+}
+
+.copilot-cargando {
+  color: rgba(238, 244, 255, 0.78);
+}
+
+.copilot-error {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #7f1d1d;
+}
+
+.copilot-meta {
+  color: rgba(238, 244, 255, 0.75);
+}
+
+.copilot-chips .chip {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.copilot-chips .chip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.copilot-foot {
+  color: rgba(238, 244, 255, 0.72);
+}
+
+.chip-f-letra {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.toolbar-buscar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-full);
+  padding: 4px 8px 4px 10px;
+}
+
+.toolbar-buscar .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.toolbar-buscar input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  width: 200px;
+  color: var(--ink);
+}
+
+.toolbar-buscar-clear {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.toolbar-buscar-clear:hover {
+  color: var(--ink);
 }
 
 .cov-list {

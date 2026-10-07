@@ -33,10 +33,29 @@ afterEach(() => {
 
 describe('CopilotPanel', () => {
   it('tiene el input habilitado y el aviso de privacidad', () => {
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     const input = screen.getByLabelText(/pregunta al copiloto/i) as HTMLInputElement
     expect(input.disabled).toBe(false)
     expect(screen.getByText(/información personal/i)).toBeInTheDocument()
+  })
+
+  it('la cabecera alterna el panel (desplegar/ocultar)', () => {
+    const onToggle = vi.fn()
+    render(<CopilotPanel contexto={contexto} abierto onToggle={onToggle} />)
+    const cabecera = screen.getByRole('button', { name: /asistente ia/i })
+    expect(cabecera).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(cabecera)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('oculto muestra solo la cabecera', () => {
+    render(<CopilotPanel contexto={contexto} abierto={false} onToggle={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /asistente ia/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.queryByLabelText(/pregunta al copiloto/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/información personal/i)).not.toBeInTheDocument()
   })
 
   it('envia la pregunta y pinta la respuesta en streaming', async () => {
@@ -52,7 +71,7 @@ describe('CopilotPanel', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     const input = screen.getByLabelText(/pregunta al copiloto/i)
     fireEvent.change(input, { target: { value: '¿Cuántos empleados hay?' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -85,7 +104,7 @@ describe('CopilotPanel', () => {
         ),
       ),
     )
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /vacaciones/i }))
     await waitFor(() => expect(screen.getByText(/ling-3.1-flash/)).toBeInTheDocument())
   })
@@ -95,7 +114,7 @@ describe('CopilotPanel', () => {
       'fetch',
       vi.fn(() => Promise.resolve(jsonResponse({ detail: 'Sin claves de IA' }, 503))),
     )
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     const input = screen.getByLabelText(/pregunta al copiloto/i)
     fireEvent.change(input, { target: { value: 'hola' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -111,7 +130,7 @@ describe('CopilotPanel', () => {
         ),
       ),
     )
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     const input = screen.getByLabelText(/pregunta al copiloto/i)
     fireEvent.change(input, { target: { value: 'hola' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -120,12 +139,39 @@ describe('CopilotPanel', () => {
     )
   })
 
+  it('la primera sugerencia es el resumen del día y se envía al pulsarla', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        sseResponse([
+          { t: 'delta', c: 'El día va estable: 130 activos de 215.' },
+          { t: 'fin', proveedor: 'openrouter', modelo: 'north', cache: false },
+        ]),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
+    const chips = Array.from(document.querySelectorAll('.copilot-chips .chip')).map(
+      (chip) => chip.textContent,
+    )
+    expect(chips[0]).toBe('¿Cómo va el día?')
+    expect(chips.length).toBeGreaterThanOrEqual(5)
+    expect(chips.join(' ')).toMatch(/vacaciones/)
+
+    fireEvent.click(screen.getByRole('button', { name: '¿Cómo va el día?' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const llamada = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const body = JSON.parse(String(llamada[1].body)) as { pregunta: string }
+    expect(body.pregunta).toBe('¿Cómo va el día?')
+  })
+
   it('no envia preguntas vacias', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
-    render(<CopilotPanel contexto={contexto} />)
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
     const input = screen.getByLabelText(/pregunta al copiloto/i)
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+

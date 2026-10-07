@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { copilotoStream } from './api'
 
 const SUGERENCIAS = [
+  '¿Cómo va el día?',
+  '¿Qué necesito gestionar hoy?',
+  '¿Qué alertas hay abiertas?',
   '¿Quién está de vacaciones hoy?',
   '¿Qué centro tiene más huecos?',
   'Muéstrame revisiones vencidas',
 ]
 
-type Props = { contexto: unknown }
+type Props = { contexto: unknown; abierto: boolean; onToggle: () => void }
 
-function CopilotPanel({ contexto }: Props) {
+function CopilotPanel({ contexto, abierto, onToggle }: Props) {
   const [valor, setValor] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [respuesta, setRespuesta] = useState('')
@@ -36,87 +39,99 @@ function CopilotPanel({ contexto }: Props) {
   }
 
   return (
-    <section className="panel-card copilot" aria-label="Copiloto de datos">
-      <header className="panel-head">
-        <div className="copilot-title">
+    <section className="panel-card copilot" aria-label="Asistente IA">
+      <header className="panel-head copilot-head">
+        <button
+          type="button"
+          className="copilot-toggle"
+          aria-expanded={abierto}
+          onClick={onToggle}
+        >
           <span className="copilot-spark material-symbols-outlined" aria-hidden="true">
             auto_awesome
           </span>
-          <div>
-            <h3>Copiloto de datos</h3>
-            <p>Pregúntale a tus hojas en lenguaje natural</p>
-          </div>
-        </div>
-        <span className="badge badge-ok">Modelos gratuitos</span>
+          <span className="copilot-titulo">
+            <strong>Asistente IA</strong>
+            <small>Pregúntale a tus hojas en lenguaje natural</small>
+          </span>
+          <span className="badge badge-ok">Modelos gratuitos</span>
+          <span className="copilot-chevron material-symbols-outlined" aria-hidden="true">
+            {abierto ? 'expand_less' : 'expand_more'}
+          </span>
+        </button>
       </header>
 
-      <div className="copilot-form">
-        <input
-          className="copilot-input"
-          type="text"
-          disabled={enviando}
-          value={valor}
-          placeholder="Pregúntale a tus datos…"
-          aria-label="Pregunta al copiloto"
-          onChange={(event) => setValor(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              void enviar(valor)
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="btn btn-primary copilot-send"
-          disabled={enviando || !valor.trim()}
-          onClick={() => void enviar(valor)}
-        >
-          {enviando ? 'Pensando…' : 'Enviar'}
-        </button>
-      </div>
+      {abierto ? (
+        <>
+          <div className="copilot-form">
+            <input
+              className="copilot-input"
+              type="text"
+              disabled={enviando}
+              value={valor}
+              placeholder="Pregúntale a tus datos…"
+              aria-label="Pregunta al copiloto"
+              onChange={(event) => setValor(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void enviar(valor)
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-primary copilot-send"
+              disabled={enviando || !valor.trim()}
+              onClick={() => void enviar(valor)}
+            >
+              {enviando ? 'Pensando…' : 'Enviar'}
+            </button>
+          </div>
 
-      <p className="copilot-chips">
-        {SUGERENCIAS.map((texto) => (
-          <button
-            key={texto}
-            type="button"
-            className="chip"
-            disabled={enviando}
-            onClick={() => {
-              setValor(texto)
-              void enviar(texto)
-            }}
-          >
-            {texto}
-          </button>
-        ))}
-      </p>
+          <p className="copilot-chips">
+            {SUGERENCIAS.map((texto) => (
+              <button
+                key={texto}
+                type="button"
+                className="chip"
+                disabled={enviando}
+                onClick={() => {
+                  setValor(texto)
+                  void enviar(texto)
+                }}
+              >
+                {texto}
+              </button>
+            ))}
+          </p>
 
-      {respuesta ? (
-        <p className="copilot-respuesta" aria-live="polite">
-          {respuesta}
-        </p>
-      ) : null}
-      {enviando && !respuesta ? (
-        <p className="copilot-respuesta copilot-cargando" aria-live="polite">
-          Consultando los modelos gratuitos…
-        </p>
-      ) : null}
-      {error ? (
-        <p className="copilot-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {meta ? (
-        <p className="copilot-meta">
-          {meta.proveedor} · {meta.modelo}
-        </p>
-      ) : null}
+          {respuesta ? (
+            <p className="copilot-respuesta" aria-live="polite">
+              {respuesta}
+            </p>
+          ) : null}
+          {enviando && !respuesta ? (
+            <p className="copilot-respuesta copilot-cargando" aria-live="polite">
+              Consultando los modelos gratuitos…
+            </p>
+          ) : null}
+          {error ? (
+            <p className="copilot-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {meta ? (
+            <p className="copilot-meta">
+              {meta.proveedor} · {meta.modelo}
+            </p>
+          ) : null}
 
-      <p className="copilot-foot">
-        Modelos gratuitos externos para datos demo. No subas información personal real.
-      </p>
+          <p className="copilot-foot">
+            Modelos gratuitos externos para datos demo. No subas información personal real.
+          </p>
+        </>
+      ) : null}
     </section>
   )
 }

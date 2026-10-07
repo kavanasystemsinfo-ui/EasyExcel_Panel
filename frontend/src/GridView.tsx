@@ -15,6 +15,7 @@ import {
   valoresDistintos,
   type Filtro,
 } from './filters'
+import { calcularPosMenu } from './filterMenuPos'
 
 type Props = {
   sheetName: string
@@ -137,15 +138,21 @@ function GridView({
     }
     function refrescar() {
       const rect = filtroBtnRef.current?.getBoundingClientRect()
-      if (rect) setFiltroPos({ top: rect.bottom + 6, left: rect.left })
+      if (!rect) return
+      const alto = filtroMenuRef.current?.offsetHeight ?? 0
+      setFiltroPos(
+        calcularPosMenu(rect, alto, window.innerHeight, window.innerWidth),
+      )
     }
     document.addEventListener('mousedown', fuera)
     window.addEventListener('scroll', refrescar, true)
     window.addEventListener('resize', refrescar)
+    const raf = requestAnimationFrame(refrescar)
     return () => {
       document.removeEventListener('mousedown', fuera)
       window.removeEventListener('scroll', refrescar, true)
       window.removeEventListener('resize', refrescar)
+      cancelAnimationFrame(raf)
     }
   }, [filtroCol])
 
@@ -156,7 +163,9 @@ function GridView({
     if (abrir) {
       filtroBtnRef.current = event.currentTarget
       const rect = event.currentTarget.getBoundingClientRect()
-      setFiltroPos({ top: rect.bottom + 6, left: rect.left })
+      setFiltroPos(
+        calcularPosMenu(rect, 0, window.innerHeight, window.innerWidth),
+      )
     }
   }
 
