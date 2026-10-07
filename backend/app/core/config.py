@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0002)
     openrouter_api_key: str = ""
-    openrouter_models: str = "inclusionai/ling-3.1-flash,cohere/north-mini-code:free"
+    openrouter_models: str = "google/gemma-4-31b-it:free,cohere/north-mini-code:free"
     nvidia_api_key: str = ""
     nvidia_models: str = "google/gemma-4-31b-it"
     copiloto_max_tokens: int = 1500
