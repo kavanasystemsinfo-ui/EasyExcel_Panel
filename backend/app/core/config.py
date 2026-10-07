@@ -21,5 +21,17 @@ class Settings(BaseSettings):
     parse_timeout_s: float = 5.0
     upload_dir: Path = BACKEND_DIR / "data" / "uploads"
 
+    # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0002)
+    openrouter_api_key: str = ""
+    openrouter_models: str = "inclusionai/ling-3.1-flash,cohere/north-mini-code:free"
+    nvidia_api_key: str = ""
+    nvidia_models: str = "google/gemma-4-31b-it"
+    copiloto_max_tokens: int = 600
+    copiloto_timeout_s: float = 90.0
+    copiloto_rate_limit: int = 40
+    copiloto_rate_window_s: int = 600
+    copiloto_cache_size: int = 200
+    copiloto_context_max_chars: int = 60_000
+
 
 settings = Settings()

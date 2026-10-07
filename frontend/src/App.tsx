@@ -25,11 +25,13 @@ import { buscarEnLibro } from './search'
 import {
   ES_SECCION,
   SECCIONES,
+  alertasDeSeccion,
   graficosDeSeccion,
   hojasDeSeccion,
   kpisDeSeccion,
   type Seccion,
 } from './views'
+import { construirContexto } from './copilot'
 import Alertas from './Alertas'
 import CoveragePanel from './CoveragePanel'
 import ChartsPanel from './ChartsPanel'
@@ -296,6 +298,34 @@ function App() {
     filtros,
   )
 
+  const contextoCopiloto = useMemo(() => {
+    const resumen = resumenFiltros(
+      hojaActiva?.header ?? [],
+      query,
+      soloActivos && conEstado,
+      filtros,
+    )
+    return construirContexto({
+      hoja: hoja ?? '',
+      seccion: nombreSeccion,
+      filtros: resumen,
+      kpis,
+      alertas: alertasDeSeccion(kpis).map((alerta) => alerta.texto),
+      header: hojaActiva?.header ?? [],
+      filas: pares.map(({ fila }) => fila),
+    })
+  }, [
+    hojaActiva,
+    query,
+    soloActivos,
+    conEstado,
+    filtros,
+    kpis,
+    hoja,
+    nombreSeccion,
+    pares,
+  ])
+
   function seleccionarHoja(name: string) {
     setHoja(name)
     setPagina(0)
@@ -545,7 +575,7 @@ function App() {
           )}
 
           <section className="bottom-panels">
-            <CopilotPanel />
+            <CopilotPanel contexto={contextoCopiloto} />
             {seccion === 'operaciones' && kpis.cobertura?.length ? (
               <CoveragePanel cobertura={kpis.cobertura} />
             ) : null}

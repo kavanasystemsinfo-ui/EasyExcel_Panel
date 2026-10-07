@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health, workbooks
+from app.ai import assistant
+from app.api.routes import copiloto, health, workbooks
 from app.core.config import settings
 from app.errors import (
     InvalidWorkbookError,
@@ -15,6 +18,11 @@ from app.errors import (
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version=settings.version)
+    if not assistant.logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        assistant.logger.addHandler(handler)
+        assistant.logger.setLevel(logging.INFO)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -24,6 +32,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(workbooks.router)
+    app.include_router(copiloto.router)
 
     def handler(status_code: int):
         def _handle(request: Request, exc: Exception) -> JSONResponse:

@@ -1094,14 +1094,69 @@
 .copilot-input {
   width: 100%;
   height: 40px;
-  border: 1px dashed var(--border-2);
+  border: 1px solid var(--border-2);
   background: var(--surface-2);
   border-radius: var(--r);
   padding: 0 14px;
   font-family: inherit;
   font-size: 13px;
+  color: var(--ink);
+}
+
+.copilot-input:focus {
+  outline: none;
+  border-color: var(--ai);
+}
+
+.copilot-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.copilot-send {
+  height: 40px;
+  white-space: nowrap;
+}
+
+.copilot-respuesta {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: var(--ai-soft);
+  border-radius: var(--r);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.copilot-cargando {
   color: var(--muted);
-  cursor: not-allowed;
+  font-style: italic;
+}
+
+.copilot-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: rgba(190, 60, 60, 0.08);
+  border: 1px solid rgba(190, 60, 60, 0.35);
+  border-radius: var(--r);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.copilot-meta {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--outline);
+  font-family: var(--mono, monospace);
+}
+
+button.chip {
+  font-family: inherit;
+  font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .copilot-chips {

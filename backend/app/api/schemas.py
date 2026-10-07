@@ -1,6 +1,10 @@
+import json
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.config import settings
 
 
 class SheetInfo(BaseModel):
@@ -31,3 +35,16 @@ class SheetRows(BaseModel):
 class ExportPayload(BaseModel):
     header: list[str]
     rows: list[list[str | int | float | bool | None]]
+
+
+class CopilotoPayload(BaseModel):
+    pregunta: str = Field(min_length=1, max_length=2000)
+    contexto: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("contexto")
+    @classmethod
+    def _limitar_contexto(cls, valor: dict[str, Any]) -> dict[str, Any]:
+        blob = json.dumps(valor, ensure_ascii=False)
+        if len(blob) > settings.copiloto_context_max_chars:
+            raise ValueError("contexto demasiado grande (maximo 60000 caracteres)")
+        return valor

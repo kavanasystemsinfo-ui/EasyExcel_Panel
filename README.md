@@ -8,16 +8,16 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 5 (exportación y pulido)
+## Estado actual: Fase 6 (copiloto IA con modelos gratuitos)
 
 | Componente | Estado |
 |---|---|
 | Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
 | Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
 | Excel en la nube de solo lectura | **DESPLEGADO** |
-| API de workbooks: carga, listado, detalle, filas, borrado, demo y export (7 endpoints) | **VERIFICADO** (30 tests + smoke con el dataset real) |
+| API de workbooks: carga, listado, detalle, filas, borrado, demo, export y copiloto (8 endpoints) | **VERIFICADO** (39 tests + smoke con el dataset real) |
 | Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (128 tests Vitest) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (146 tests Vitest) |
 | Navegación por 4 vistas (Resumen, Personal, Operaciones, Datos) con KPIs, gráficos y hojas por dominio | **VERIFICADO** (tests de `views.ts` + E2E de navegación) |
 | Vista Resumen: 6 KPIs del día + alertas del día, sin tabla | **VERIFICADO** (E2E con capturas) |
 | Scroll del dashboard con rueda y barra siempre visible (fix de app shell) | **VERIFICADO** (E2E: `scrollTop` 0 → 460 con la rueda) |
@@ -26,7 +26,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Menú "Exportar" (Excel/PDF) en topbar y toolbar, con estado "Generando…" y Excel deshabilitado en Resumen | **VERIFICADO** (6 tests de UI + E2E) |
 | Menú de filtro de columna en portal `body` (no se recorta con pocas filas) | **VERIFICADO** (E2E: `position: fixed`, cabida en viewport con 1 fila) |
 | KPIs calculados en cliente desde las hojas del propio Excel | **VERIFICADO** (14 tests de lógica pura + 3 de UI) |
-| Paneles Cobertura por centro (en Operaciones) y Copiloto (IA pendiente) | **VERIFICADO** (E2E navegador con capturas) |
+| Paneles Cobertura por centro (en Operaciones) y Copiloto | **VERIFICADO** (E2E navegador con capturas) |
 | Demo automática al entrar (libro sembrado en el servidor, sin subir nada) | **VERIFICADO** (E2E navegador) |
 | Edición libre en cliente: celdas, filas y columnas con persistencia local | **VERIFICADO** (17 tests + E2E: persiste tras recarga) |
 | Sesión local por visitante y botón "Restablecer" al original | **VERIFICADO** (E2E navegador con capturas) |
@@ -36,7 +36,8 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Vista persistente (sección, hoja, filtros, búsqueda, página) en la sesión | **VERIFICADO** (tests de sesión + E2E tras recarga) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
 | CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| IA real y multiusuario | No implementado aún |
+| Copiloto IA: preguntas en lenguaje natural con contexto anclado (KPIs, alertas, conteos por columna y muestra filtrada), streaming SSE, cadena de respaldo de modelos gratuitos (OpenRouter → NVIDIA), rate limit por IP y caché de preguntas repetidas | **VERIFICADO** (9 tests backend + 14 frontend + E2E real: "¿Cuántos de vacaciones hoy?" → "15 empleados" = `kpis.vacaciones.hoy`, vía `openrouter · cohere/north-mini-code:free`) |
+| Auth y multiusuario | No implementado aún |
 
 El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
 (React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker), la persistencia
@@ -44,6 +45,30 @@ de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
 (FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas) y
 la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
 (sessionStorage por visitante: se restablece al cerrar el navegador, sin JWT hasta que haya multiusuario).
+
+### Copiloto IA (modelos gratuitos)
+
+`POST /api/v1/copiloto` recibe `{pregunta, contexto}` y responde por **SSE**
+(eventos `delta` → `fin`, o `error`). El proveedor se decide en el servidor:
+
+| Orden | Proveedor | Modelo | Latencia medida (2026-10-06) |
+|---|---|---|---|
+| 1 | OpenRouter | `inclusionai/ling-3.1-flash` | ttfb 1,5 s (si da 429 salta al siguiente) |
+| 2 | OpenRouter | `cohere/north-mini-code:free` | ttfb 1,4 s |
+| 3 | NVIDIA NIM | `google/gemma-4-31b-it` | ~45 s (respaldo por cuota de OpenRouter) |
+
+- **Contexto anclado**: el frontend envía hoja, sección, filtros activos, KPIs,
+  alertas, conteos por columna (máx. 8 columnas categóricas con ≤40 valores) y
+  una muestra de 15 filas filtradas; el system prompt prohíbe inventar números
+  y manda reproducir los del contexto. Máximo 60.000 caracteres serializados.
+- **Protecciones**: 40 consultas / 10 min por IP, caché de 200 preguntas
+  idénticas, `max_tokens` 600 y timeout de 90 s; sin ninguna clave configurada
+  responde `503`; logging de cada intento (`easyexcel.copiloto`).
+- **Claves**: `backend/.env` (gitignorado) con `EASYEXCEL_OPENROUTER_API_KEY`
+  y `EASYEXCEL_NVIDIA_API_KEY`; ver `backend/.env.example`.
+- **Privacidad**: la UI avisa que se usan modelos gratuitos externos para
+  datos demo y que no debe subirse información personal real; solo viajan la
+  pregunta y el resumen calculado, nunca el Excel completo.
 
 ### Excel de demo en la nube (solo lectura)
 
@@ -173,7 +198,18 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
    - Pulido: el menú de filtro de columna se sirve en un portal al `body`
      (con una o dos filas ya no queda recortado) y el contador de búsqueda
      muestra el total filtrado sin el texto incorrecto "en la página"
-6. **Fase 6** — Autenticación y multiusuario (opcional)
+6. **Fase 6** — Copiloto IA con modelos gratuitos ✅
+   - `POST /api/v1/copiloto` con streaming SSE: cadena conmutable de
+     proveedores (OpenRouter `ling-3.1-flash` → `north-mini-code:free` →
+     NVIDIA `gemma-4-31b-it`), con benchmarks reales de latencia del
+     06/10/2026, rate limit por IP, caché de preguntas repetidas y logging
+     de intentos
+   - Contexto anclado a los datos del dashboard (KPIs, alertas, conteos por
+     columna y muestra filtrada) con system prompt que prohíbe inventar
+     números; el panel escribe en streaming, muestra proveedor y modelo, y
+     avisa de que son modelos gratuitos para datos demo sin información
+     personal real
+7. **Fase 7** — Autenticación y multiusuario (opcional)
 7. **Fase 7** — Docker, despliegue y documentación final
 
 ## Nota de privacidad

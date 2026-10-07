@@ -87,3 +87,63 @@ export async function exportSheet(
   if (!response.ok) throw await errorDe(response)
   return response.blob()
 }
+
+export type FinCopiloto = {
+  proveedor: string
+  modelo: string
+  cache: boolean
+}
+
+type EventoCopiloto = {
+  t: 'delta' | 'fin' | 'error'
+  c?: string
+  detalle?: string
+  proveedor?: string
+  modelo?: string
+  cache?: boolean
+}
+
+export async function copilotoStream(
+  pregunta: string,
+  contexto: unknown,
+  onDelta: (texto: string) => void,
+): Promise<FinCopiloto> {
+  const response = await fetch(`${BASE}/api/v1/copiloto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pregunta, contexto }),
+  })
+  if (!response.ok) throw await errorDe(response)
+
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('El copiloto devolvio una respuesta vacia')
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let fin: FinCopiloto | null = null
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const partes = buffer.split('\n\n')
+    buffer = partes.pop() ?? ''
+    for (const parte of partes) {
+      const linea = parte.split('\n').find((l) => l.startsWith('data: '))
+      if (!linea) continue
+      const evento = JSON.parse(linea.slice(6)) as EventoCopiloto
+      if (evento.t === 'delta' && evento.c) {
+        onDelta(evento.c)
+      } else if (evento.t === 'fin') {
+        fin = {
+          proveedor: evento.proveedor ?? '',
+          modelo: evento.modelo ?? '',
+          cache: Boolean(evento.cache),
+        }
+      } else if (evento.t === 'error') {
+        throw new Error(evento.detalle ?? 'El copiloto no pudo responder')
+      }
+    }
+  }
+  if (!fin) throw new Error('La respuesta del copiloto se interrumpio')
+  return fin
+}
