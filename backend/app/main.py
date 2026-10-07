@@ -19,9 +19,9 @@ from app.errors import (
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version=settings.version)
     if not assistant.logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
-        assistant.logger.addHandler(handler)
+        log_handler = logging.StreamHandler()
+        log_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        assistant.logger.addHandler(log_handler)
         assistant.logger.setLevel(logging.INFO)
     app.add_middleware(
         CORSMiddleware,
