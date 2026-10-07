@@ -335,6 +335,13 @@ function App() {
     setRowsError(null)
   }
 
+  function irAlCopiloto() {
+    const panel = document.querySelector('.copilot')
+    panel?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    const input = document.querySelector<HTMLInputElement>('.copilot-input')
+    input?.focus()
+  }
+
   function cambiarSeccion(siguiente: Seccion) {
     setSeccion(siguiente)
     const nombres = wb?.hojas.map((h) => h.name) ?? []
@@ -434,6 +441,7 @@ function App() {
           exportExcel={seccion !== 'resumen'}
           onExportExcel={exportarExcel}
           onExportPdf={exportarPdf}
+          onAsistente={irAlCopiloto}
         />
 
         <div className="app-content">

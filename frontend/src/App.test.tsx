@@ -172,3 +172,35 @@ describe('App con demo automatica (Fase 3)', () => {
   })
 })
 
+describe('Asistente IA del topbar (Fase 6)', () => {
+  it('esta habilitado y al pulsarlo enfoca el input del copiloto', async () => {
+    const fetchMock = vi.fn((url: string | URL | Request) => {
+      const href = String(url)
+      if (href.includes('/sheets/Ventas/rows')) {
+        return Promise.resolve(jsonResponse(sheetRows))
+      }
+      if (href.endsWith('/workbooks/demo')) {
+        return Promise.resolve(
+          jsonResponse({
+            id: 'd3e0demo000000000000000000000000',
+            filename: 'easyexcel_demo.xlsx',
+            uploaded_at: '2026-10-05T00:00:00+00:00',
+            sheets: [{ name: 'Ventas', rows: 2, cols: 2 }],
+          }),
+        )
+      }
+      return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
+    const asistente = screen.getByRole('button', { name: /asistente ia/i })
+    expect(asistente).toBeEnabled()
+    const input = screen.getByLabelText(/pregunta al copiloto/i)
+    expect(document.activeElement).not.toBe(input)
+    fireEvent.click(asistente)
+    await waitFor(() => expect(document.activeElement).toBe(input))
+  })
+})
+
