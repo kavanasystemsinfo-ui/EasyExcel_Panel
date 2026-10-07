@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     openrouter_models: str = "inclusionai/ling-3.1-flash,cohere/north-mini-code:free"
     nvidia_api_key: str = ""
     nvidia_models: str = "google/gemma-4-31b-it"
-    copiloto_max_tokens: int = 600
+    copiloto_max_tokens: int = 1500
     copiloto_timeout_s: float = 90.0
     copiloto_rate_limit: int = 40
     copiloto_rate_window_s: int = 600

@@ -74,7 +74,7 @@ la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
   vacaciones hoy?", "¿Qué centro tiene más huecos?" y "Muéstrame revisiones
   vencidas".
 - **Protecciones**: 40 consultas / 10 min por IP, caché de 200 preguntas
-  idénticas, `max_tokens` 600 y timeout de 90 s; sin ninguna clave configurada
+  idénticas, `max_tokens` 1.500 y timeout de 90 s; sin ninguna clave configurada
   responde `503`; logging de cada intento (`easyexcel.copiloto`).
 - **Claves**: `backend/.env` (gitignorado) con `EASYEXCEL_OPENROUTER_API_KEY`
   y `EASYEXCEL_NVIDIA_API_KEY`; ver `backend/.env.example`.

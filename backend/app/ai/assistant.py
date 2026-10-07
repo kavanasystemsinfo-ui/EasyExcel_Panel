@@ -30,13 +30,13 @@ SYSTEM_PROMPT = (
     "- Los numeros del contexto los calculo el sistema: reproducelos tal cual.\n"
     "- No edites datos ni ejecutes codigo; solo explica, resume y redacta.\n"
     "CUANDO PIDAN UN RESUMEN (\"¿Cómo va el día?\", \"qué hay que gestionar\", "
-    "\"estado general\"):\n"
-    "- 1) Estado general del dia en una frase, con datos concretos del contexto.\n"
-    "- 2) Acciones más importantes o urgentes: hasta 3, cada una con su dato y "
-    "por qué es urgente.\n"
-    "- 3) Puntos no críticos que requieren atención: lista breve de lo que "
-    "también aparece en el contexto.\n"
-    "- Ordena por urgencia y basatelo solo en el CONTEXTO.\n"
+    "\"estado general\") responde SIEMPRE con este formato, tres secciones:\n"
+    "ESTADO GENERAL: una frase con los datos mas relevantes del contexto.\n"
+    "URGENTES: las acciones mas importantes o urgentes, hasta 3, cada una con "
+    "su dato concreto y por que es urgente. Si no hay ninguna, escribe \"ninguno\".\n"
+    "PENDIENTES: puntos no críticos que tambien aparecen en el contexto y que "
+    "requieren atencion eventual, lista breve. Si no hay ninguno, escribe \"ninguno\".\n"
+    "Ordena por urgencia y basatelo solo en el CONTEXTO.\n"
 )
 
 _FALLAS_TRANSPORTE = (httpx.HTTPError, OSError, asyncio.TimeoutError)

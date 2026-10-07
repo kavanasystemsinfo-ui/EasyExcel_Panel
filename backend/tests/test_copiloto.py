@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.ai import assistant
+from app.core.config import settings
 from app.main import app
 
 client = TestClient(app)
@@ -204,6 +205,13 @@ def test_pregunta_y_contexto_llegan_al_modelo(
     assert messages[0]["role"] == "system"
 
 
+def test_max_tokens_cubre_el_razonamiento_del_resumen() -> None:
+    # north-mini entra en modo razonamiento con la pregunta del resumen:
+    # con 600 tokens se agota el presupuesto antes de emitir contenido
+    # (finish_reason=length, medido 2026-10-07 con el contexto real del demo)
+    assert settings.copiloto_max_tokens >= 1500
+
+
 def test_prompt_estructura_el_resumen_del_dia() -> None:
     prompt = assistant.SYSTEM_PROMPT.lower()
     # la pregunta generica "¿Cómo va el día?" debe recibir un resumen jerarquizado
@@ -211,6 +219,11 @@ def test_prompt_estructura_el_resumen_del_dia() -> None:
     assert "urgente" in prompt
     assert "no crítico" in prompt or "no critico" in prompt
     assert "atención" in prompt or "atencion" in prompt
+    # el formato es explicito con etiquetas para que el modelo lo siga
+    assert "estado general:" in prompt
+    assert "urgentes:" in prompt
+    assert "pendientes:" in prompt
+    assert "ninguno" in prompt
 
 
 def test_pregunta_vacia_devuelve_422() -> None:
