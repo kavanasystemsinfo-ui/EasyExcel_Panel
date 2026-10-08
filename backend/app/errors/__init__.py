@@ -1,5 +1,3 @@
-from .errors import *
-
 # Moved from errors.py
 class WorkbookError(Exception):
     """Error de dominio relacionado con la carga o lectura de Excel."""
