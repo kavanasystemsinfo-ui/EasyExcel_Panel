@@ -5,11 +5,11 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Query, Response, UploadFile
 
 from app.api.schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
-from app.core.config import settings
+from ..core.config import settings
 from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
 from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
-from app.errors import (
+from ..errors import (
     InvalidWorkbookError,
     WorkbookNotFoundError,
     WorkbookTooLargeError,
