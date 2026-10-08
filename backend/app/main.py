@@ -58,7 +58,7 @@ async def get_demo_data():
     from openpyxl import load_workbook
     from fastapi import HTTPException
 
-    default_path = os.path.join(os.path.dirname(__file__), "data", "default_demo.xlsx")
+    default_path = os.path.join(os.path.dirname(__file__), "..", "data", "default_demo.xlsx")
     if not os.path.exists(default_path):
         raise HTTPException(status_code=404, detail="Default demo file not found")
 
