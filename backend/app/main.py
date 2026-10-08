@@ -4,10 +4,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .ai import assistant
-from .api.routes import copiloto, health, workbooks
-from .core.config import settings
-from .errors import (
+from backend.app.ai import assistant
+from backend.app.api.routes import copiloto, health, workbooks
+from backend.app.core.config import settings
+from backend.app.errors import (
     InvalidWorkbookError,
     WorkbookLimitError,
     WorkbookNotFoundError,

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
-from ...core.config import settings
+from backend.app.core.config import settings
 
 router = APIRouter(tags=["health"])
 
