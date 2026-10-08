@@ -8,9 +8,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.ai import assistant
-from app.core.config import settings
-from app.main import app
+from backend.app.ai import assistant
+from backend.app.core.config import settings
+from backend.app.main import app
 
 client = TestClient(app)
 
