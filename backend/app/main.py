@@ -60,16 +60,26 @@ async def get_demo_data():
 
     default_path = os.path.join(os.path.dirname(__file__), "..", "data", "default_demo.xlsx")
     if not os.path.exists(default_path):
-        raise HTTPException(status_code=404, detail="Default demo file not found")
+        # Gather debug info
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+        parent_dir = os.path.dirname(__file__)
+        debug = {
+            "path": default_path,
+            "exists": False,
+            "parent_dir": parent_dir,
+            "data_dir": data_dir,
+            "data_dir_contents": os.listdir(data_dir) if os.path.exists(data_dir) else "data_dir not found",
+            "parent_dir_contents": os.listdir(parent_dir) if os.path.exists(parent_dir) else "parent_dir not found"
+        }
+        raise HTTPException(status_code=404, detail=debug)
 
     wb = load_workbook(default_path, data_only=True)
     sheet = wb.active
     data = []
     for row in sheet.iter_rows(values_only=True):
         data.append(list(row))
-
-    if len(data) > 0:
-        headers = data[0]
-        rows = data[1:]
-        return {"headers": headers, "rows": rows}
-    return {"headers": [], "rows": []}
+    if not data:
+        raise HTTPException(status_code=404, detail="Demo file is empty")
+    headers = data[0]
+    rows = data[1:]
+    return {"headers": headers, "rows": rows}
