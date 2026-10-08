@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 
-from .core.config import settings
+from ..core.config import settings
 
 SYSTEM_PROMPT = (
     "Eres el copiloto de EasyExcel Panel, un panel de datos Excel para un "
