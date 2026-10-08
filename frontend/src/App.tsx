@@ -46,6 +46,24 @@ import UploadZone from './UploadZone'
 import { borrarSesion, cargarSesion, guardarSesion, nuevoToken } from './session'
 
 function messageOf(error: unknown, fallback: string): string {
+
+import { useEffect } from "react";
+
+// Despues de definir tu estado para los datos (ej: const [data, setData] = useState(null);)
+useEffect(() => {
+    // Solo carga demo si no hay datos subidos manualmente
+    if (!data) {
+        fetch("/api/v1/demo-data")
+            .then(res => res.json())
+            .then(json => {
+                if (json.headers && json.rows) {
+                    setData({ headers: json.headers, rows: json.rows });
+                }
+            })
+            .catch(err => console.error("Error cargando demo:", err));
+    }
+}, [data]); // Ejecuta cuando 'data' cambia (inicialmente null)
+
   return error instanceof Error ? error.message : fallback
 }
 

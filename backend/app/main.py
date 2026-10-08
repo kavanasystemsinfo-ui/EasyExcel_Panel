@@ -50,3 +50,26 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+@app.get("/api/v1/demo-data")
+async def get_demo_data():
+    """Endpoint que devuelve los datos del Excel por defecto"""
+    import os
+    from openpyxl import load_workbook
+    from fastapi import HTTPException
+
+    default_path = os.path.join(os.path.dirname(__file__), "data", "default_demo.xlsx")
+    if not os.path.exists(default_path):
+        raise HTTPException(status_code=404, detail="Default demo file not found")
+
+    wb = load_workbook(default_path, data_only=True)
+    sheet = wb.active
+    data = []
+    for row in sheet.iter_rows(values_only=True):
+        data.append(list(row))
+
+    if len(data) > 0:
+        headers = data[0]
+        rows = data[1:]
+        return {"headers": headers, "rows": rows}
+    return {"headers": [], "rows": []}
