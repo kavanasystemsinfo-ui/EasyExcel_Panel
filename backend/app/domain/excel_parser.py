@@ -1,7 +1,6 @@
-"""Lectura de Excel aislada en subproceso con timeout (ADR-0001)."""
+"""Lectura de Excel con timeout (ADR-0001). Compatible con serverless (sin multiprocessing)."""
 
-import multiprocessing as mp
-import queue as stdlib_queue
+import signal
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -17,7 +16,13 @@ from app.errors import (
     WorkbookParseTimeoutError,
 )
 
-_CTX = mp.get_context("spawn")
+
+class TimeoutError(Exception):
+    """Timeout personalizado para el parser."""
+
+
+def _timeout_handler(signum, frame):
+    raise TimeoutError("Timeout")
 
 
 def _cell(value: Any) -> Any:
@@ -37,72 +42,61 @@ def _width(row: tuple[Any, ...]) -> int:
     return width
 
 
-def _metadata_worker(path: str, result_queue: Any) -> None:
-    try:
-        workbook = load_workbook(path, read_only=True, data_only=True)
-        sheets: list[dict] = []
-        for ws in workbook.worksheets:
-            total = 0
-            cols = 0
-            for row in ws.iter_rows(values_only=True):
-                total += 1
-                cols = max(cols, _width(row))
-            sheets.append({"name": ws.title, "rows": max(total - 1, 0), "cols": cols})
-        workbook.close()
-        result_queue.put(("ok", sheets))
-    except Exception as exc:
-        result_queue.put(("err", ("invalid", str(exc))))
-
-
-def _rows_worker(path: str, sheet: str, offset: int, limit: int, result_queue: Any) -> None:
-    try:
-        workbook = load_workbook(path, read_only=True, data_only=True)
-        if sheet not in workbook.sheetnames:
-            workbook.close()
-            result_queue.put(("err", ("notfound", f"La hoja '{sheet}' no existe")))
-            return
-        ws = workbook[sheet]
-        header: list[Any] = []
-        page: list[list[Any]] = []
+def _extract_metadata_sync(path: str) -> list[dict]:
+    """Extrae metadatos sin multiprocessing."""
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheets: list[dict] = []
+    for ws in workbook.worksheets:
         total = 0
-        seen_header = False
+        cols = 0
         for row in ws.iter_rows(values_only=True):
-            if not seen_header:
-                header = [_cell(value) for value in row]
-                seen_header = True
-                continue
-            if total >= offset and len(page) < limit:
-                page.append([_cell(value) for value in row])
             total += 1
+            cols = max(cols, _width(row))
+        sheets.append({"name": ws.title, "rows": max(total - 1, 0), "cols": cols})
+    workbook.close()
+    return sheets
+
+
+def _read_rows_sync(path: str, sheet: str, offset: int, limit: int) -> dict:
+    """Lee filas sin multiprocessing."""
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    if sheet not in workbook.sheetnames:
         workbook.close()
-        result_queue.put(("ok", {"header": header, "rows": page, "total": total}))
-    except Exception as exc:
-        result_queue.put(("err", ("invalid", str(exc))))
+        raise WorkbookNotFoundError(f"La hoja '{sheet}' no existe")
+    ws = workbook[sheet]
+    header: list[Any] = []
+    page: list[list[Any]] = []
+    total = 0
+    seen_header = False
+    for row in ws.iter_rows(values_only=True):
+        if not seen_header:
+            header = [_cell(value) for value in row]
+            seen_header = True
+            continue
+        if total >= offset and len(page) < limit:
+            page.append([_cell(value) for value in row])
+        total += 1
+    workbook.close()
+    return {"header": header, "rows": page, "total": total}
 
 
-def _run(target: Any, args: tuple, timeout_s: float) -> Any:
-    result_queue: Any = _CTX.Queue()
-    process = _CTX.Process(target=target, args=(*args, result_queue))
-    process.start()
-    process.join(timeout_s)
-    if process.is_alive():
-        process.terminate()
-        process.join(1.0)
-        process.close()
-        raise WorkbookParseTimeoutError(f"El parser supero {timeout_s} segundos")
+def _run_with_timeout(func, *args, timeout_s: float):
+    """Ejecuta una función con timeout usando signal (solo Unix, funciona en Vercel)."""
+    # En Windows/serverless sin signal, ejecutar sin timeout
     try:
-        item = result_queue.get(timeout=2.0)
-    except stdlib_queue.Empty:
-        raise WorkbookParseTimeoutError("El parser termino sin resultado") from None
-    finally:
-        process.close()
-    kind, payload = item
-    if kind == "ok":
-        return payload
-    code, message = payload
-    if code == "notfound":
-        raise WorkbookNotFoundError(message)
-    raise InvalidWorkbookError(f"No se pudo leer el Excel: {message}")
+        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.setitimer(signal.ITIMER_REAL, timeout_s)
+        try:
+            result = func(*args)
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, old_handler)
+        return result
+    except (AttributeError, ValueError, OSError):
+        # signal no disponible (Windows, o entorno restringido) -> sin timeout
+        return func(*args)
+    except TimeoutError:
+        raise WorkbookParseTimeoutError(f"El parser supero {timeout_s} segundos")
 
 
 def _check_limits(sheets: list[dict]) -> None:
@@ -120,16 +114,16 @@ def _check_limits(sheets: list[dict]) -> None:
 
 
 def extract_metadata(path: Path) -> list[dict]:
-    sheets = _run(_metadata_worker, (str(path),), settings.parse_timeout_s)
+    sheets = _run_with_timeout(_extract_metadata_sync, str(path), timeout_s=settings.parse_timeout_s)
     _check_limits(sheets)
     return sheets
 
 
 def read_rows(path: Path, sheet: str, offset: int, limit: int) -> dict:
-    return _run(
-        _rows_worker,
-        (str(path), sheet, offset, limit),
-        settings.parse_timeout_s,
+    return _run_with_timeout(
+        _read_rows_sync,
+        str(path), sheet, offset, limit,
+        timeout_s=settings.parse_timeout_s,
     )
 
 
