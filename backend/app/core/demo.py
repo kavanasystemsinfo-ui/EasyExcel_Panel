@@ -13,7 +13,7 @@ DEMO_ID = hashlib.sha256(b"easyexcel:demo:v1").hexdigest()[:32]
 
 
 def _source() -> Path:
-    return BACKEND_DIR.parent / "data" / DEMO_FILENAME
+    return BACKEND_DIR / "data" / DEMO_FILENAME
 
 
 def ensure_demo() -> dict | None:
