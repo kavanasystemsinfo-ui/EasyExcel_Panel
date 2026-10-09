@@ -5,8 +5,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from backend.app.ai import assistant
-from backend.app.api.schemas import CopilotoPayload
+from app.ai import assistant
+from app.api.schemas import CopilotoPayload
 
 router = APIRouter(tags=["copiloto"])
 

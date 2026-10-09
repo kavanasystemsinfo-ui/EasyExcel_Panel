@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from backend.app.core.config import settings
+from app.core.config import settings
 
 
 class SheetInfo(BaseModel):

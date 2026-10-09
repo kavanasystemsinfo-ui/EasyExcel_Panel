@@ -3,9 +3,9 @@
 import hashlib
 from pathlib import Path
 
-from backend.app.core.config import BACKEND_DIR, settings
-from backend.app.core.storage import WorkbookStorage
-from backend.app.domain import excel_parser
+from app.core.config import BACKEND_DIR, settings
+from app.core.storage import WorkbookStorage
+from app.domain import excel_parser
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"

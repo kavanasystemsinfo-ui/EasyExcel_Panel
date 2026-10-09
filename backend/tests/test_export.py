@@ -9,8 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
 
-from backend.app.core.config import settings
-from backend.app.main import app
+from app.core.config import settings
+from app.main import app
 
 CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

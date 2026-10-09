@@ -10,8 +10,8 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
-from backend.app.core.config import settings
-from backend.app.main import app
+from app.core.config import settings
+from app.main import app
 
 CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -224,7 +224,7 @@ def test_demo_filas_reales(client):
 
 def test_demo_no_se_puede_borrar(client):
     assert client.get("/api/v1/workbooks/demo").status_code == 200
-    from backend.app.core.demo import DEMO_ID
+    from app.core.demo import DEMO_ID
 
     assert client.delete("/api/v1/workbooks/demo").status_code == 400
     assert client.delete(f"/api/v1/workbooks/{DEMO_ID}").status_code == 400

@@ -5,10 +5,10 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Query, Response, UploadFile
 
 from ..schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
-from backend.app.core.config import settings
-from backend.app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
-from backend.app.core.storage import WorkbookStorage
-from backend.app.domain import excel_parser
+from app.core.config import settings
+from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
+from app.core.storage import WorkbookStorage
+from app.domain import excel_parser
 from ...errors import (
     InvalidWorkbookError,
     WorkbookNotFoundError,

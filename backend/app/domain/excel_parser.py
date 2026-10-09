@@ -9,8 +9,8 @@ from typing import Any
 
 from openpyxl import Workbook, load_workbook
 
-from backend.app.core.config import settings
-from backend.app.errors import (
+from app.core.config import settings
+from app.errors import (
     InvalidWorkbookError,
     WorkbookLimitError,
     WorkbookNotFoundError,
