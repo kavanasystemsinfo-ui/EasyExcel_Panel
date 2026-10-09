@@ -13,7 +13,20 @@ DEMO_ID = hashlib.sha256(b"easyexcel:demo:v1").hexdigest()[:32]
 
 
 def _source() -> Path:
-    return BACKEND_DIR / "data" / DEMO_FILENAME
+    # En Vercel: BACKEND_DIR = /var/task/backend/app -> /var/task/backend/data
+    # En local: BACKEND_DIR = /root/EasyExcel_Panel/backend/app -> /root/EasyExcel_Panel/backend/data
+    path1 = BACKEND_DIR / "data" / DEMO_FILENAME
+    if path1.is_file():
+        return path1
+    # Fallback: buscar en el directorio padre (estructura local original)
+    path2 = BACKEND_DIR.parent / "data" / DEMO_FILENAME
+    if path2.is_file():
+        return path2
+    # Último intento: ruta absoluta conocida en Vercel
+    path3 = Path("/var/task/backend/data") / DEMO_FILENAME
+    if path3.is_file():
+        return path3
+    return path1  # devuelve el primero para que falle con mensaje claro
 
 
 def ensure_demo() -> dict | None:
