@@ -30,6 +30,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
     )
+    
     app.include_router(health.router)
     app.include_router(workbooks.router)
     app.include_router(copiloto.router)
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
 
 @app.get("/api/v1/demo-data")
 async def get_demo_data():
