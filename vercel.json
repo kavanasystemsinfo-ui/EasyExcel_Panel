@@ -12,9 +12,5 @@
       "src": "/(.*)",
       "dest": "backend/app/main.py"
     }
-  ],
-  "env": {
-    "EASYEXCEL_OPENROUTER_API_KEY": "@easyexcel-openrouter-api-key",
-    "EASYEXCEL_NVIDIA_API_KEY": "@easyexcel-nvidia-api-key"
-  }
+  ]
 }
