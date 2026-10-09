@@ -1,8 +1,9 @@
 import logging
-
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.ai import assistant
 from app.api.routes import copiloto, health, workbooks
@@ -14,6 +15,8 @@ from app.errors import (
     WorkbookParseTimeoutError,
     WorkbookTooLargeError,
 )
+
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "static"
 
 
 def create_app() -> FastAPI:
@@ -33,6 +36,10 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(workbooks.router)
     app.include_router(copiloto.router)
+
+    # Servir frontend estático si existe
+    if FRONTEND_DIR.is_dir():
+        app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
     def handler(status_code: int):
         def _handle(request: Request, exc: Exception) -> JSONResponse:
