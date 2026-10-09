@@ -1,8 +1,18 @@
 from pathlib import Path
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+# En Vercel el filesystem es read-only excepto /tmp
+# Detectar si estamos en Vercel (variables de entorno características)
+IS_VERCEL = os.environ.get("VERCEL") == "1" or os.environ.get("VERCEL_ENV") is not None
+
+if IS_VERCEL:
+    UPLOAD_BASE = Path("/tmp") / "easyexcel-uploads"
+else:
+    UPLOAD_BASE = BACKEND_DIR / "data" / "uploads"
 
 
 class Settings(BaseSettings):
@@ -19,7 +29,7 @@ class Settings(BaseSettings):
     max_rows_per_sheet: int = 100_000
     max_export_cells: int = 2_000_000
     parse_timeout_s: float = 5.0
-    upload_dir: Path = BACKEND_DIR / "data" / "uploads"
+    upload_dir: Path = UPLOAD_BASE
 
     # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0002)
     openrouter_api_key: str = ""
