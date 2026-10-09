@@ -1,7 +1,6 @@
 """Workbook demo publico: se siembra bajo demanda y es de solo lectura."""
 
 import hashlib
-import os
 from pathlib import Path
 
 from app.core.config import BACKEND_DIR, settings
@@ -43,16 +42,6 @@ def ensure_demo() -> dict | None:
     """
     source = _source()
     if not source.is_file():
-        print(f"DEBUG: Demo file not found at {source}")
-        print(f"DEBUG: BACKEND_DIR = {BACKEND_DIR}")
-        print(f"DEBUG: CWD = {Path.cwd()}")
-        try:
-            for root, dirs, files in os.walk(BACKEND_DIR.parent):
-                for f in files:
-                    if f == DEMO_FILENAME:
-                        print(f"DEBUG: Found {f} at {root}")
-        except Exception as e:
-            print(f"DEBUG: walk error: {e}")
         return None
     storage = WorkbookStorage(settings.upload_dir)
     manifest = storage.get(DEMO_ID)
