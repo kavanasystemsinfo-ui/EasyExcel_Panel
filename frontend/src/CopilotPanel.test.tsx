@@ -87,6 +87,38 @@ describe('CopilotPanel', () => {
     expect(body.contexto).toEqual(contexto)
   })
 
+  it('renderiza la negrita markdown de la respuesta sin mostrar asteriscos', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          sseResponse([
+            { t: 'delta', c: '**ESTADO GENERAL:** 30 bajas y ' },
+            { t: 'delta', c: '59 solicitudes pendientes.\\n\\n**URGENTES:**\\n- 30 bajas.' },
+            {
+              t: 'fin',
+              proveedor: 'openrouter',
+              modelo: 'inclusionai/ling-3.1-flash',
+              cache: false,
+            },
+          ]),
+        ),
+      ),
+    )
+
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
+    const input = screen.getByLabelText(/pregunta al copiloto/i)
+    fireEvent.change(input, { target: { value: '¿Cómo va el día?' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    const respuesta = await screen.findByRole('status')
+    await waitFor(() => expect(respuesta.textContent).toContain('URGENTES:'))
+    expect(respuesta.textContent).not.toContain('**')
+    const strongs = respuesta.querySelectorAll('strong')
+    expect(strongs.length).toBeGreaterThanOrEqual(2)
+    expect(strongs[0]?.textContent).toBe('ESTADO GENERAL:')
+  })
+
   it('muestra el proveedor y el modelo usado tras responder', async () => {
     vi.stubGlobal(
       'fetch',

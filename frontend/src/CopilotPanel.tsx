@@ -10,6 +10,18 @@ const SUGERENCIAS = [
   'Muéstrame revisiones vencidas',
 ]
 
+/** Render minimalista de markdown para respuestas del copiloto: **negrita**, *cursiva*, listas. */
+function renderRespuesta(texto: string): string {
+  const escachado = texto
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+  return escachado
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/\n/g, '<br/>')
+}
+
 type Props = { contexto: unknown; abierto: boolean; onToggle: () => void }
 
 function CopilotPanel({ contexto, abierto, onToggle }: Props) {
@@ -107,9 +119,12 @@ function CopilotPanel({ contexto, abierto, onToggle }: Props) {
           </p>
 
           {respuesta ? (
-            <p className="copilot-respuesta" aria-live="polite">
-              {respuesta}
-            </p>
+            <p
+              className="copilot-respuesta"
+              aria-live="polite"
+              role="status"
+              dangerouslySetInnerHTML={{ __html: renderRespuesta(respuesta) }}
+            />
           ) : null}
           {enviando && !respuesta ? (
             <p className="copilot-respuesta copilot-cargando" aria-live="polite">
