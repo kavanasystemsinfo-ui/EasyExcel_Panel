@@ -9,7 +9,7 @@ from app.domain import excel_parser
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"
-DEMO_ID = hashlib.sha256(b"easyexcel:demo:v1").hexdigest()[:32]
+DEMO_ID = hashlib.sha256(b"easyexcel:demo:v2").hexdigest()[:32]
 
 
 def _source() -> Path:
