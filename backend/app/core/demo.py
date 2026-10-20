@@ -13,7 +13,7 @@ from app.core.storage import WorkbookStorage
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"
-DEMO_ID = hashlib.sha256(b"easyexcel:demo:v5").hexdigest()[:32]
+DEMO_ID = hashlib.sha256(b"easyexcel:demo:v6").hexdigest()[:32]
 
 
 def _generate_metalurgica_demo() -> bytes:
@@ -275,32 +275,9 @@ def _generate_metalurgica_demo() -> bytes:
 
 
 def _source() -> Path:
-    # En Vercel: BACKEND_DIR = /var/task/_vendor/backend/app -> /var/task/_vendor/backend/data
-    #           O también podría estar en /var/task/backend/data (fuera del vendor)
-    # En local: BACKEND_DIR = /root/EasyExcel_Panel/backend/app -> /root/EasyExcel_Panel/backend/data
-    path1 = BACKEND_DIR / "data" / DEMO_FILENAME
-    if path1.is_file():
-        return path1
-    # Fallback: buscar en el directorio padre (estructura local original)
-    path2 = BACKEND_DIR.parent / "data" / DEMO_FILENAME
-    if path2.is_file():
-        return path2
-    # En Vercel: fuera del vendor
-    path3 = Path("/var/task/backend/data") / DEMO_FILENAME
-    if path3.is_file():
-        return path3
-    # En Vercel: dentro del vendor
-    path4 = Path("/var/task/_vendor/backend/data") / DEMO_FILENAME
-    if path4.is_file():
-        return path4
-    # En Vercel: archivos incluidos en la raíz del function
-    path5 = Path("/var/task") / DEMO_FILENAME
-    if path5.is_file():
-        return path5
-    path6 = Path("/var/task/data") / DEMO_FILENAME
-    if path6.is_file():
-        return path6
-    return path1  # devuelve el primero para que falle con mensaje claro
+    # FORZAR generación programática: devolver path que no existe
+    # para que ensure_demo() genere el Excel en memoria
+    return BACKEND_DIR / "data" / "DO_NOT_USE_THIS_FILE.xlsx"
 
 
 def ensure_demo() -> dict | None:
