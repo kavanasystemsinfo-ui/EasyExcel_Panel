@@ -39,7 +39,7 @@ def _get_manifest(workbook_id: str) -> dict:
 
 
 def _resolve_id(workbook_id: str) -> str:
-    if workbook_id != DEMO_ALIAS:
+    if workbook_id != DEMO_ALIAS and workbook_id != DEMO_ID:
         return workbook_id
     if ensure_demo() is None:
         raise WorkbookNotFoundError(
