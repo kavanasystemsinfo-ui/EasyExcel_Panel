@@ -31,6 +31,13 @@ def _source() -> Path:
     path4 = Path("/var/task/_vendor/backend/data") / DEMO_FILENAME
     if path4.is_file():
         return path4
+    # En Vercel: archivos incluidos en la raíz del function
+    path5 = Path("/var/task") / DEMO_FILENAME
+    if path5.is_file():
+        return path5
+    path6 = Path("/var/task/data") / DEMO_FILENAME
+    if path6.is_file():
+        return path6
     return path1  # devuelve el primero para que falle con mensaje claro
 
 
