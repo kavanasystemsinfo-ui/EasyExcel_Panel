@@ -13,7 +13,7 @@ from app.core.storage import WorkbookStorage
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"
-DEMO_ID = hashlib.sha256(b"easyexcel:demo:v4").hexdigest()[:32]
+DEMO_ID = hashlib.sha256(b"easyexcel:demo:v5").hexdigest()[:32]
 
 
 def _generate_metalurgica_demo() -> bytes:
