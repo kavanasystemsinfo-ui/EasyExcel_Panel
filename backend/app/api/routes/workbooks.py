@@ -97,8 +97,10 @@ def get_sheet_rows(
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
     if sheet_name not in sheet_names:
         raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
+    storage = _storage()
+    book_path = storage._ensure_book_exists(manifest["id"])
     payload = excel_parser.read_rows(
-        _storage().book_path(manifest["id"]), sheet_name, offset, limit
+        book_path, sheet_name, offset, limit
     )
     return {
         "sheet": sheet_name,
@@ -118,6 +120,8 @@ def export_sheet(
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
     if sheet_name not in sheet_names:
         raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
+    storage = _storage()
+    book_path = storage._ensure_book_exists(manifest["id"])
     content = excel_parser.build_export(payload.header, payload.rows)
     stem = str(manifest.get("filename", "libro")).rsplit(".", 1)[0] or "libro"
     name = re.sub(r'[\\/:*?"<>|]', "_", f"{stem}_{sheet_name}.xlsx")
