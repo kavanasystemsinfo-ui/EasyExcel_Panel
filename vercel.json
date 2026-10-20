@@ -17,7 +17,7 @@
       "config": {
         "maxLambdaSize": "15mb",
         "runtime": "python3.12",
-        "includeFiles": ["backend/data/**"]
+        "includeFiles": "backend/data/**"
       }
     }
   ],
