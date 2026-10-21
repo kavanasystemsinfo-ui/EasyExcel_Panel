@@ -1,11 +1,69 @@
+# Configuracion de Render para EasyExcel Panel.
+#
+# POR QUE RENDER Y NO VERCEL
+# Vercel (funciones serverless) monta el filesystem en /tmp, que NO sobrevive
+# entre invocaciones: el Excel subido se perdia y las hojas dejaban de
+# cargarse ("a veces no carga"). Render es un servicio web con disco
+# persistente, asi que los ficheros sobreviven al reinicio de la instancia.
+#
+# ARQUITECTURA
+# - easyexcel-backend: API FastAPI (este repo). Datos en /var/data (disco).
+# - easyexcel-frontend: sitio estatico Vite, servido por Render con proxy
+#   /api hacia el backend. Asi el navegador ve un unico origen (sin CORS) y
+#   no hace falta VITE_API_URL.
+#
+# Documentacion: https://render.com/docs/blueprint-spec
+
 services:
+  # ── API ────────────────────────────────────────────────────────────────
   - type: web
     name: easyexcel-backend
-    env: python
-    buildCommand: pip install -r backend/requirements.txt
-startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    runtime: python
+    # La app se importa como 'app.main:app' (NO 'backend.app.main:app'):
+    # main.py usa imports absolutos del tipo 'from app.ai import assistant',
+    # que solo resuelven si backend/ esta en el path de trabajo.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Health check: endpoint /health del modulo health.
+    healthCheckPath: /health
+    autoDeploy: true
+    # Disco persistente para los Excel subidos. Sin esto, el almacenamiento
+    # efimero de /tmp perderia los ficheros al reiniciar la instancia.
+    # NOTA: los discos persistentes de Render requieren plan de pago; en el
+    # plan gratuito este bloque se ignora y el almacenamiento es efimero
+    # (el sintoma volveria a aparecer).
+    disk:
+      name: easyexcel-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: EASYEXCEL_OPENROUTER_API_KEY
-        value: ""
+        sync: false
       - key: EASYEXCEL_NVIDIA_API_KEY
-        value: ""
+        sync: false
+      # Directorio de uploads: apunta al disco persistente.
+      - key: EASYEXCEL_UPLOAD_DIR
+        value: /var/data/uploads
+      # CORS: allow_origins vacio porque el proxy serve todo desde el mismo
+      # origen. Se deja el dominio propio por si el frontend se sirve aparte.
+      - key: EASYEXCEL_CORS_ORIGINS
+        value: '["https://easyexcel.kavanasystems.com","http://localhost:5173","http://localhost:8000"]'
+
+  # ── Frontend estatico ──────────────────────────────────────────────────
+  - type: web
+    name: easyexcel-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    # Dominio propio del panel. Con este proxy, el navegador llama a
+    # /api/... en el mismo origen y el proxy lo reenvia al backend.
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://easyexcel-backend.onrender.com/api/*
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN

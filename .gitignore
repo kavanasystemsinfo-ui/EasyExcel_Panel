@@ -11,3 +11,5 @@ Thumbs.db
 .vscode/
 backend/data/uploads/
 .vercel
+frontend/dist/
+frontend/node_modules/

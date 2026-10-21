@@ -5,11 +5,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
-# En Vercel el filesystem es read-only excepto /tmp
-# Detectar si estamos en Vercel (variables de entorno características)
+# En Vercel (funciones serverless) el filesystem es read-only excepto /tmp,
+# y ademas /tmp no sobrevive entre invocaciones: los Excel subidos se
+# pierden. Por eso ahi se usa /tmp de forma consciente.
+#
+# En Render (servicio web con disco persistente) el almacenamiento debe ir a
+# /var/data, que es el punto de montaje del disco. Se detecta por la variable
+# de entorno EASYEXCEL_UPLOAD_DIR, que tiene prioridad sobre cualquier
+# deteccion automatica.
+#
+# En local se usa backend/data/uploads.
 IS_VERCEL = os.environ.get("VERCEL") == "1" or os.environ.get("VERCEL_ENV") is not None
 
-if IS_VERCEL:
+if os.environ.get("EASYEXCEL_UPLOAD_DIR"):
+    # Prioridad maxima: lo que diga el entorno (Render, Docker, produccion).
+    UPLOAD_BASE = Path(os.environ["EASYEXCEL_UPLOAD_DIR"])
+elif IS_VERCEL:
     UPLOAD_BASE = Path("/tmp") / "easyexcel-uploads"
 else:
     UPLOAD_BASE = BACKEND_DIR / "data" / "uploads"
