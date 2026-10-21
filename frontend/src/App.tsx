@@ -21,6 +21,14 @@ import {
 import { pasaFiltros, resumenFiltros, type Filtro } from './filters'
 import { descargarBlob, nombreExport, payloadExport } from './export'
 import { calcularKpis, type SheetData } from './kpis'
+import {
+  alertasGenericas,
+  esLibroDemo,
+  inferirGraficos,
+  inferirKpis,
+  seccionesDeLibro,
+  sugerenciasCopiloto,
+} from './insights'
 import { buscarEnLibro } from './search'
 import {
   ES_SECCION,
@@ -273,8 +281,29 @@ function App() {
     for (const h of wb.hojas) data[h.name] = { header: h.header, rows: h.rows }
     return data
   }, [wb])
-  const kpis = useMemo(() => calcularKpis(kpisData, hoy), [kpisData, hoy])
-  const graficos = useMemo(() => generarGraficos(kpisData), [kpisData])
+
+  const nombresHojasActuales = useMemo(
+    () => wb?.hojas.map((h) => h.name) ?? [],
+    [wb],
+  )
+  const esDemo = esLibroDemo(nombresHojasActuales)
+
+  const kpis = useMemo(
+    () => (esDemo ? calcularKpis(kpisData, hoy) : {}),
+    [kpisData, hoy, esDemo],
+  )
+  const kpisGenericos = useMemo(
+    () => (esDemo ? [] : inferirKpis(kpisData)),
+    [kpisData, esDemo],
+  )
+  const graficosBase = useMemo(
+    () => (esDemo ? generarGraficos(kpisData) : inferirGraficos(kpisData)),
+    [kpisData, esDemo],
+  )
+  const alertasActuales = useMemo(
+    () => (esDemo ? alertasDeSeccion(kpis) : alertasGenericas(kpisData)),
+    [esDemo, kpis, kpisData],
+  )
 
   const busquedaGlobal = useMemo(() => {
     if (!wb || norm(query).length < 2) return null
@@ -285,15 +314,26 @@ function App() {
   }, [wb, query])
 
   const filtrando = Boolean(query.trim()) || (soloActivos && conEstado) || filtros.length > 0
-  const nombresHojas = wb ? wb.hojas.map((h) => h.name) : []
+  const nombresHojas = nombresHojasActuales
   const hojasVisibles = hojasDeSeccion(seccion, nombresHojas)
   const sheetsSelector = (wb?.hojas ?? [])
     .filter((h) => hojasVisibles.includes(h.name))
     .sort((a, b) => hojasVisibles.indexOf(a.name) - hojasVisibles.indexOf(b.name))
     .map((h) => ({ name: h.name, rows: h.rows.length, cols: h.header.length }))
   const kpisSeccion = kpisDeSeccion(seccion)
-  const graficosSeccion = graficosDeSeccion(seccion, graficos)
-  const nombreSeccion = SECCIONES.find((s) => s.id === seccion)?.nombre ?? 'Panel'
+  const graficosSeccion = graficosDeSeccion(seccion, graficosBase)
+  const seccionesLibro = useMemo(() => {
+    const base = seccionesDeLibro(nombresHojas)
+    return base.map((s) => SECCIONES.find((x) => x.id === s.id) ?? s)
+  }, [nombresHojas])
+
+  useEffect(() => {
+    if (wb && seccionesLibro.length && !seccionesLibro.some((s) => s.id === seccion)) {
+      setSeccion('resumen')
+    }
+  }, [wb, seccionesLibro, seccion])
+
+  const nombreSeccion = seccionesLibro.find((s) => s.id === seccion)?.nombre ?? 'Panel'
   const filtrosImpresion = resumenFiltros(
     hojaActiva?.header ?? [],
     query,
@@ -313,7 +353,7 @@ function App() {
       seccion: nombreSeccion,
       filtros: resumen,
       kpis,
-      alertas: alertasDeSeccion(kpis).map((alerta) => alerta.texto),
+      alertas: alertasActuales.map((alerta) => alerta.texto),
       header: hojaActiva?.header ?? [],
       filas: pares.map(({ fila }) => fila),
     })
@@ -324,6 +364,7 @@ function App() {
     conEstado,
     filtros,
     kpis,
+    alertasActuales,
     hoja,
     nombreSeccion,
     pares,
@@ -426,6 +467,7 @@ function App() {
         active={hoja}
         onSelect={seleccionarHoja}
         onReset={reset}
+        secciones={seccionesLibro}
       />
 
       <div className="app-main">
@@ -442,6 +484,8 @@ function App() {
           exportExcel={seccion !== 'resumen'}
           onExportExcel={exportarExcel}
           onExportPdf={exportarPdf}
+          titulo={esDemo ? 'Panel de Operaciones' : wb.filename}
+          esDemo={esDemo}
         />
 
         <div className="app-content">
@@ -463,7 +507,7 @@ function App() {
           <section className="banner">
             <div>
               <h2>
-                Gestión de Personal y Operaciones
+                {esDemo ? 'Gestión de Personal y Operaciones' : wb.filename}
                 <span className="banner-pill">
                   Corte:{' '}
                   {hoy.toLocaleDateString('es-ES', {
@@ -474,8 +518,9 @@ function App() {
                 </span>
               </h2>
               <p>
-                Modo demo: los cambios se guardan solo en tu navegador — pulsa Restablecer
-                para volver al original.
+                {esDemo
+                  ? 'Modo demo: los cambios se guardan solo en tu navegador — pulsa Restablecer para volver al original.'
+                  : `${wb.hojas.length} hoja${wb.hojas.length === 1 ? '' : 's'} · los cambios se guardan solo en tu navegador.`}
               </p>
             </div>
             <div className="banner-actions">
@@ -513,12 +558,18 @@ function App() {
             onToggle={() =>
               guardarCopiloto(copilotoAbierto ? 'cerrado' : 'abierto')
             }
+            esDemo={esDemo}
+            sugerencias={
+              esDemo
+                ? undefined
+                : sugerenciasCopiloto(hojaActiva?.header ?? [], hoja ?? 'libro')
+            }
           />
 
-          <KpiCards kpis={kpis} solo={kpisSeccion} />
+          <KpiCards kpis={kpis} solo={kpisSeccion} genericos={esDemo ? [] : kpisGenericos} />
 
           {seccion === 'resumen' ? (
-            <Alertas kpis={kpis} />
+            <Alertas kpis={kpis} alertas={esDemo ? undefined : alertasActuales} />
           ) : (
             <section className="grid-section">
               <div className="grid-head">

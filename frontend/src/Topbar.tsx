@@ -16,6 +16,8 @@ type Props = {
   exportExcel?: boolean
   onExportExcel?: () => void | Promise<void>
   onExportPdf?: () => void
+  titulo?: string
+  esDemo?: boolean
 }
 
 function Topbar({
@@ -31,6 +33,8 @@ function Topbar({
   exportExcel = true,
   onExportExcel,
   onExportPdf,
+  titulo = 'Panel de Operaciones',
+  esDemo = true,
 }: Props) {
   const [abierto, setAbierto] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -49,7 +53,7 @@ function Topbar({
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <h1>Panel de Operaciones</h1>
+        <h1>{titulo}</h1>
         <span className="topbar-sheets">{sheetCount} hojas</span>
       </div>
 
@@ -127,12 +131,14 @@ function Topbar({
         <button type="button" className="btn btn-primary" onClick={onUploadClick}>
           Cargar .xlsx
         </button>
-        <span className="chip-user" title="Datos de ejemplo, sin cuenta real">
-          <span className="avatar-mini" aria-hidden="true">
-            D
+        {esDemo ? (
+          <span className="chip-user" title="Datos de ejemplo, sin cuenta real">
+            <span className="avatar-mini" aria-hidden="true">
+              D
+            </span>
+            Modo demo
           </span>
-          Modo demo
-        </span>
+        ) : null}
       </div>
     </header>
   )

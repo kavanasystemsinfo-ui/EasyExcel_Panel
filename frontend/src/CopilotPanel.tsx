@@ -10,6 +10,15 @@ const SUGERENCIAS = [
   'Muéstrame revisiones vencidas',
 ]
 
+const SUGERENCIAS_GENERICAS = [
+  'Resume este libro',
+  '¿Qué hojas tiene?',
+  '¿Cuáles son los totales?',
+  '¿Hay datos incompletos?',
+  '¿Qué columnas numéricas hay?',
+  'Dame 3 conclusiones',
+]
+
 /** Render minimalista de markdown para respuestas del copiloto: **negrita**, *cursiva*, listas. */
 function renderRespuesta(texto: string): string {
   const escachado = texto
@@ -22,9 +31,16 @@ function renderRespuesta(texto: string): string {
     .replace(/\n/g, '<br/>')
 }
 
-type Props = { contexto: unknown; abierto: boolean; onToggle: () => void }
+type Props = {
+  contexto: unknown
+  abierto: boolean
+  onToggle: () => void
+  sugerencias?: string[]
+  esDemo?: boolean
+}
 
-function CopilotPanel({ contexto, abierto, onToggle }: Props) {
+function CopilotPanel({ contexto, abierto, onToggle, sugerencias, esDemo = true }: Props) {
+  const chips = sugerencias ?? (esDemo ? SUGERENCIAS : SUGERENCIAS_GENERICAS)
   const [valor, setValor] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [respuesta, setRespuesta] = useState('')
@@ -102,7 +118,7 @@ function CopilotPanel({ contexto, abierto, onToggle }: Props) {
           </div>
 
           <p className="copilot-chips">
-            {SUGERENCIAS.map((texto) => (
+            {chips.map((texto) => (
               <button
                 key={texto}
                 type="button"
@@ -143,7 +159,9 @@ function CopilotPanel({ contexto, abierto, onToggle }: Props) {
           ) : null}
 
           <p className="copilot-foot">
-            Modelos gratuitos externos para datos demo. No subas información personal real.
+            {esDemo
+              ? 'Modelos gratuitos externos para datos demo. No subas información personal real.'
+              : 'Modelos gratuitos externos. No subas información personal real.'}
           </p>
         </>
       ) : null}

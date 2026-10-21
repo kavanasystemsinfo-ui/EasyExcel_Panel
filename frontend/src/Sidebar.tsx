@@ -8,6 +8,7 @@ type Props = {
   active: string | null
   onSelect: (name: string) => void
   onReset: () => void
+  secciones?: { id: Seccion; nombre: string; icono: string }[]
 }
 
 function formatSincronizado(value: string): string {
@@ -22,7 +23,7 @@ function formatSincronizado(value: string): string {
   })
 }
 
-function Sidebar({ wb, seccion, onSeccion, active, onSelect, onReset }: Props) {
+function Sidebar({ wb, seccion, onSeccion, active, onSelect, onReset, secciones = SECCIONES }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -56,7 +57,7 @@ function Sidebar({ wb, seccion, onSeccion, active, onSelect, onReset }: Props) {
       <nav className="secciones" aria-label="Secciones">
         <p className="ws-title">VISTAS</p>
         <ul>
-          {SECCIONES.map((item) => (
+          {secciones.map((item) => (
             <li key={item.id}>
               <button
                 type="button"

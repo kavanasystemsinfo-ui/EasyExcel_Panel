@@ -51,11 +51,11 @@ export function graficosDeSeccion(seccion: Seccion, disponibles: Grafico[]): Gra
     .map((id) => disponibles.find((g) => g.id === id))
     .filter((g): g is Grafico => g !== undefined)
   if (elegidos.length) return elegidos
-  return disponibles.slice(0, 2)
+  return disponibles.slice(0, 4)
 }
 
 export type Alerta = {
-  id: 'bajas' | 'vacaciones' | 'vencidas' | 'proximas' | 'sin-incidencias'
+  id: string
   tono: 'danger' | 'warn' | 'info' | 'ok'
   texto: string
 }

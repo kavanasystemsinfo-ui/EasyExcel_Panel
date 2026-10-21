@@ -63,7 +63,7 @@ describe('App', () => {
       expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
     )
     expect(screen.getByRole('cell', { name: 'Sofa' })).toBeInTheDocument()
-    expect(screen.getByText('demo.xlsx')).toBeInTheDocument()
+    expect(screen.getAllByText('demo.xlsx').length).toBeGreaterThan(0)
     expect(screen.getByRole('tab', { name: /Ventas/ })).toBeInTheDocument()
   })
 
@@ -170,6 +170,90 @@ describe('App con demo automatica (Fase 3)', () => {
     await waitFor(() =>
       expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
     )
+  })
+})
+
+describe('Libro generico (cualquier Excel)', () => {
+  const ventasManifest = {
+    id: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    filename: 'informe_ventas.xlsx',
+    uploaded_at: '2026-10-21T10:00:00+00:00',
+    sheets: [{ name: 'Ventas', rows: 3, cols: 4 }],
+  }
+  const ventasRows = {
+    sheet: 'Ventas',
+    header: ['ID', 'Cliente', 'Importe', 'Estado'],
+    rows: [
+      [1, 'Acme', 120.5, 'Pagado'],
+      [2, 'Beta', 80, 'Pendiente'],
+      [3, 'Acme', 200, 'Pagado'],
+    ],
+    total: 3,
+    offset: 0,
+    limit: 100,
+  }
+
+  function mockGenerico() {
+    const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url)
+      if (href.endsWith('/api/v1/workbooks') && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse(ventasManifest, 201))
+      }
+      if (href.includes('/sheets/Ventas/rows')) {
+        return Promise.resolve(jsonResponse(ventasRows))
+      }
+      return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('sube un Excel ajeno y pinta KPIs y alertas genericos', async () => {
+    mockGenerico()
+    render(<App />)
+    const input = screen.getByLabelText(/archivo excel/i)
+    const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Cliente' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('informe_ventas.xlsx').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Gestión de Personal y Operaciones')).not.toBeInTheDocument()
+    expect(screen.queryByText('Modo demo')).not.toBeInTheDocument()
+  })
+
+  it('en la vista Resumen muestra tarjetas de filas y suma', async () => {
+    mockGenerico()
+    render(<App />)
+    const input = screen.getByLabelText(/archivo excel/i)
+    const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Cliente' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Resumen' }))
+    await waitFor(() => {
+      expect(screen.getByText(/filas en ventas/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/suma de importe/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Alertas del día' })).toBeInTheDocument()
+    expect(screen.getByText(/cliente/i)).toBeInTheDocument()
+  })
+
+  it('el sidebar solo ofrece Resumen y Datos', async () => {
+    mockGenerico()
+    render(<App />)
+    const input = screen.getByLabelText(/archivo excel/i)
+    const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
+    fireEvent.change(input, { target: { files: [file] } })
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Cliente' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: 'Resumen' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Datos' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Personal' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Operaciones' })).not.toBeInTheDocument()
   })
 })
 

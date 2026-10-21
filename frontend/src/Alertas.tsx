@@ -1,5 +1,5 @@
 import type { Kpis } from './kpis'
-import { alertasDeSeccion } from './views'
+import { alertasDeSeccion, type Alerta } from './views'
 
 const ICONO: Record<string, string> = {
   danger: 'error',
@@ -8,10 +8,10 @@ const ICONO: Record<string, string> = {
   ok: 'check_circle',
 }
 
-type Props = { kpis: Kpis }
+type Props = { kpis: Kpis; alertas?: Alerta[] }
 
-function Alertas({ kpis }: Props) {
-  const alertas = alertasDeSeccion(kpis)
+function Alertas({ kpis, alertas: directas }: Props) {
+  const alertas = directas ?? alertasDeSeccion(kpis)
   return (
     <section className="alertas-card" aria-label="Alertas del día">
       <header className="panel-head">

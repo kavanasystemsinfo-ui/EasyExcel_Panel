@@ -1,6 +1,7 @@
 import type { Kpis } from './kpis'
+import type { KpiGenerica } from './insights'
 
-type Props = { kpis: Kpis; solo?: string[] | null }
+type Props = { kpis: Kpis; solo?: string[] | null; genericos?: KpiGenerica[] }
 
 type Tarjeta = {
   key: string
@@ -140,8 +141,19 @@ function tarjetas(k: Kpis): Tarjeta[] {
   return out
 }
 
-function KpiCards({ kpis, solo = null }: Props) {
-  const visibles = tarjetas(kpis).filter((card) => !solo || solo.includes(card.key))
+function KpiCards({ kpis, solo = null, genericos = [] }: Props) {
+  const especificas = tarjetas(kpis).filter((card) => !solo || solo.includes(card.key))
+  const genericasFiltradas = genericos.filter(
+    (g) => !solo || solo.length === 0 || solo.includes(g.key),
+  ).map((g): Tarjeta => ({
+    key: g.key,
+    overline: g.titulo.toUpperCase(),
+    icon: 'analytics',
+    valor: g.valor,
+    sub: g.subtitulo,
+    footer: { izq: '', izqTono: 'muted', der: '', derTono: 'muted' },
+  }))
+  const visibles: Tarjeta[] = [...especificas, ...genericasFiltradas]
   if (!visibles.length) return null
 
   return (
@@ -181,10 +193,12 @@ function KpiCards({ kpis, solo = null }: Props) {
               <span style={{ width: `${card.barra}%` }} />
             </div>
           ) : null}
-          <p className="kpi-footer">
-            <span className={tonoClase(card.footer.izqTono)}>{card.footer.izq}</span>
-            <span className={tonoClase(card.footer.derTono)}>{card.footer.der}</span>
-          </p>
+          {(card.footer.izq || card.footer.der) ? (
+            <p className="kpi-footer">
+              <span className={tonoClase(card.footer.izqTono)}>{card.footer.izq}</span>
+              <span className={tonoClase(card.footer.derTono)}>{card.footer.der}</span>
+            </p>
+          ) : null}
         </article>
       ))}
     </section>

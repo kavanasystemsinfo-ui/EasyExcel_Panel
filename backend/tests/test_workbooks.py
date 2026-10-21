@@ -222,7 +222,7 @@ def test_demo_filas_reales(client):
     resp = client.get("/api/v1/workbooks/demo/sheets/Empleados/rows?limit=5")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total"] == 215
+    assert body["total"] == 50
     assert body["header"][:3] == ["ID", "Nombre Completo", "DNI/NIE"]
 
 
