@@ -3,7 +3,7 @@ import re
 import shutil
 import uuid
 import base64
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 _ID_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -106,3 +106,47 @@ class WorkbookStorage:
             return False
         shutil.rmtree(target)
         return True
+
+    def purge_expired(
+        self, ttl_hours: float, exclude: set[str] | None = None
+    ) -> int:
+        """Borra workbooks con uploaded_at mas antiguo que ttl_hours.
+
+        Los ids de `exclude` (el demo) nunca se tocan. Un directorio sin
+        manifest legible (subida interrumpida) caduca por su mtime.
+        Devuelve el numero de directorios borrados.
+        """
+        if ttl_hours <= 0 or not self.root.is_dir():
+            return 0
+        exclude = exclude or set()
+        cutoff = datetime.now(UTC) - timedelta(hours=ttl_hours)
+        removed = 0
+        for child in list(self.root.iterdir()):
+            if not child.is_dir() or not self.valid_id(child.name):
+                continue
+            if child.name in exclude:
+                continue
+            manifest = self.get(child.name)
+            uploaded: datetime | None = None
+            if manifest is not None:
+                try:
+                    uploaded = datetime.fromisoformat(
+                        str(manifest.get("uploaded_at", ""))
+                    )
+                except ValueError:
+                    uploaded = None
+                if uploaded is not None and uploaded.tzinfo is None:
+                    uploaded = uploaded.replace(tzinfo=UTC)
+            if uploaded is None:
+                # Sin manifest o fecha ilegible: caducar por mtime del dir.
+                try:
+                    uploaded = datetime.fromtimestamp(
+                        child.stat().st_mtime, UTC
+                    )
+                except OSError:
+                    continue
+            if uploaded >= cutoff:
+                continue
+            shutil.rmtree(child, ignore_errors=True)
+            removed += 1
+        return removed

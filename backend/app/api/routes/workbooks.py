@@ -31,6 +31,11 @@ def _storage() -> WorkbookStorage:
     return WorkbookStorage(settings.upload_dir)
 
 
+def _purge() -> None:
+    """Caducidad de subidas (efimero): nunca toca el demo."""
+    _storage().purge_expired(settings.upload_ttl_hours, exclude={DEMO_ID})
+
+
 def _get_manifest(workbook_id: str) -> dict:
     manifest = _storage().get(_resolve_id(workbook_id))
     if manifest is None:
@@ -68,6 +73,7 @@ async def upload_workbook(
     if data[:4] != ZIP_MAGIC:
         raise InvalidWorkbookError("El contenido no es un .xlsx valido")
     storage = _storage()
+    storage.purge_expired(settings.upload_ttl_hours, exclude={DEMO_ID})
     workbook_id = storage.save_book(data)
     try:
         book_path = storage.book_path(workbook_id)
@@ -93,16 +99,19 @@ async def upload_workbook(
 
 @router.get("", response_model=list[WorkbookListItem])
 def list_workbooks() -> list[dict]:
+    _purge()
     return _storage().list()
 
 
 @router.get("/demo", response_model=WorkbookOut)
 def get_demo() -> dict:
+    _purge()
     return _get_manifest(DEMO_ALIAS)
 
 
 @router.get("/{workbook_id}", response_model=WorkbookOut)
 def get_workbook(workbook_id: str) -> dict:
+    _purge()
     return _get_manifest(workbook_id)
 
 
@@ -136,6 +145,7 @@ def export_sheet(
     sheet_name: str,
     payload: ExportPayload,
 ) -> Response:
+    _purge()
     manifest = _get_manifest(workbook_id)
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
     if sheet_name not in sheet_names:

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     parse_timeout_s: float = 5.0
     upload_dir: Path = UPLOAD_BASE
 
+    # Subidas efimeras (ADR-0004): los Excel de usuarios caducan y se
+    # borran solos; solo el demo persiste. Horas de vida de una subida.
+    upload_ttl_hours: float = 2.0
+
     # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0002)
     openrouter_api_key: str = ""
     openrouter_models: str = "google/gemma-4-31b-it:free,cohere/north-mini-code:free"

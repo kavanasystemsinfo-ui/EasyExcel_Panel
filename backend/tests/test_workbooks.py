@@ -3,7 +3,8 @@
 TDD: estos tests definen el comportamiento antes de implementar.
 """
 
-from datetime import datetime
+import json
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
 import pytest
@@ -178,6 +179,97 @@ def test_borrado(client, xlsx_2_hojas):
     assert client.delete(f"/api/v1/workbooks/{wb_id}").status_code == 204
     assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 404
     assert client.delete(f"/api/v1/workbooks/{wb_id}").status_code == 404
+
+
+# ------------------------------------------------- caducidad (TTL efimero)
+
+
+def _envejecer(tmp_path, wb_id: str, horas: float) -> None:
+    """Antes el uploaded_at del manifest para simular una subida vieja."""
+    manifest_path = tmp_path / wb_id / "manifest.json"
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data["uploaded_at"] = (datetime.now(UTC) - timedelta(hours=horas)).isoformat()
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def test_ttl_default_dos_horas():
+    assert settings.upload_ttl_hours == 2
+
+
+def test_purga_elimina_subidas_expiradas(client, xlsx_2_hojas, tmp_path):
+    wb_id = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, wb_id, horas=3)
+
+    resp = client.get("/api/v1/workbooks")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+    assert not (tmp_path / wb_id).exists()
+
+
+def test_purga_conserva_lo_dentro_del_ttl(client, xlsx_2_hojas, tmp_path):
+    wb_id = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, wb_id, horas=1)
+
+    resp = client.get("/api/v1/workbooks")
+
+    assert [w["id"] for w in resp.json()] == [wb_id]
+    assert (tmp_path / wb_id).is_dir()
+
+
+def test_purga_no_toca_el_demo(client, tmp_path):
+    demo_id = client.get("/api/v1/workbooks/demo").json()["id"]
+    _envejecer(tmp_path, demo_id, horas=48)
+
+    client.get("/api/v1/workbooks")  # dispara la purga
+
+    assert (tmp_path / demo_id).is_dir()
+    assert client.get("/api/v1/workbooks/demo").status_code == 200
+    assert client.get(f"/api/v1/workbooks/{demo_id}").status_code == 200
+
+
+def test_upload_dispara_purga(client, xlsx_2_hojas, tmp_path):
+    viejo = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, viejo, horas=3)
+
+    nuevo = upload(client, xlsx_2_hojas).json()["id"]
+
+    assert not (tmp_path / viejo).exists()
+    assert (tmp_path / nuevo).is_dir()
+    ids = [w["id"] for w in client.get("/api/v1/workbooks").json()]
+    assert ids == [nuevo]
+
+
+def test_export_libro_expirado_404(client, xlsx_2_hojas, tmp_path):
+    wb_id = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, wb_id, horas=3)
+
+    resp = client.post(
+        f"/api/v1/workbooks/{wb_id}/sheets/Ventas%202026/export",
+        json={"header": ["A"], "rows": [[1]]},
+    )
+
+    assert resp.status_code == 404
+    assert not (tmp_path / wb_id).exists()
+
+
+def test_ttl_configurable_por_env(client, xlsx_2_hojas, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "upload_ttl_hours", 1)
+    wb_id = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, wb_id, horas=1.5)
+
+    assert client.get("/api/v1/workbooks").json() == []
+    assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 404
+
+
+def test_arrancar_el_demo_tambien_purga(client, xlsx_2_hojas, tmp_path):
+    """La home carga el demo: esa visita debe limpiar subidas caducas."""
+    wb_id = upload(client, xlsx_2_hojas).json()["id"]
+    _envejecer(tmp_path, wb_id, horas=3)
+
+    assert client.get("/api/v1/workbooks/demo").status_code == 200
+
+    assert not (tmp_path / wb_id).exists()
 
 
 def test_tipos_fecha_iso(client):
