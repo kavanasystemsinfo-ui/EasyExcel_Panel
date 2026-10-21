@@ -38,10 +38,13 @@ API) o caducidad con TTL. Se eligió TTL a petición explícita del propietario.
 
 ## Consecuencias
 
-- Un usuario que sube un Excel y vuelve a la pestaña pasadas 2 horas pierde el
-  libro del servidor: la sesión local sigue pintando el grid y el export sigue
-  funcionando (el payload lleva los datos), pero `GET /{id}` devolverá 404. Es
-  el comportamiento pedido: nada permanente.
+- Un usuario que sube un Excel y vuelve a la pestaña pasadas de 2 horas pierde
+  el libro del servidor: la sesión local sigue pintando el grid (vive en
+  `sessionStorage`), pero `GET /{id}` y el export devuelven 404 porque el
+  export valida el manifest que ya caducó. En la práctica son pestañas de
+  trabajo de más de 2 horas; si resulta molesto, el siguiente paso es hacer el
+  export stateless (el payload ya lleva todos los datos). Es el comportamiento
+  pedido: nada permanente.
 - El disco solo retiene el demo y las subidas de las últimas 2 horas; el uso se
   mantiene acotado sin cron ni tareas programadas en Render.
 - La purga añade un barrido de directorios por request. Con pocos workbooks
