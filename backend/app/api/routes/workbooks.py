@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
@@ -18,6 +19,8 @@ from ...errors import (
 router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 
 ZIP_MAGIC = b"PK\x03\x04"
+OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+EXTENSIONES = {".xlsx", ".xls", ".ods", ".csv"}
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -64,23 +67,34 @@ async def upload_workbook(
     sin acceso al /tmp de la subida (problema de efimeridad).
     """
     filename = file.filename or ""
-    if not filename.lower().endswith(".xlsx"):
-        raise InvalidWorkbookError("Solo se admiten archivos .xlsx")
+    if Path(filename).suffix.lower() not in EXTENSIONES:
+        raise InvalidWorkbookError(
+            "Formatos admitidos: .xlsx, .xls, .ods o .csv"
+        )
     data = await file.read()
     max_bytes = settings.max_upload_mb * 1024 * 1024
     if len(data) > max_bytes:
         raise WorkbookTooLargeError(f"El archivo supera {settings.max_upload_mb} MB")
-    if data[:4] != ZIP_MAGIC:
-        raise InvalidWorkbookError("El contenido no es un .xlsx valido")
+    ext = Path(filename).suffix.lower()
+    if ext in {".xlsx", ".ods"}:
+        if data[:4] != ZIP_MAGIC:
+            raise InvalidWorkbookError(f"El contenido no es un {ext} valido")
+    elif ext == ".xls":
+        if data[:8] != OLE2_MAGIC:
+            raise InvalidWorkbookError("El contenido no es un .xls valido")
+    elif b"\x00" in data[:8192]:
+        raise InvalidWorkbookError("El contenido no es un .csv valido")
     storage = _storage()
     storage.purge_expired(settings.upload_ttl_hours, exclude={DEMO_ID})
     workbook_id = storage.save_book(data)
     try:
         book_path = storage.book_path(workbook_id)
-        sheets_meta: list[dict] = excel_parser.extract_metadata(book_path)
+        sheets_meta: list[dict] = excel_parser.extract_metadata(book_path, filename)
         sheets_full: list[dict] = []
         for s in sheets_meta:
-            payload = excel_parser.read_rows(book_path, s["name"], 0, s["rows"] or 1)
+            payload = excel_parser.read_rows(
+                book_path, s["name"], 0, s["rows"] or 1, filename
+            )
             sheets_full.append(
                 {
                     "name": s["name"],
@@ -129,7 +143,7 @@ def get_sheet_rows(
     storage = _storage()
     book_path = storage._ensure_book_exists(manifest["id"])
     payload = excel_parser.read_rows(
-        book_path, sheet_name, offset, limit
+        book_path, sheet_name, offset, limit, manifest.get("filename")
     )
     return {
         "sheet": sheet_name,

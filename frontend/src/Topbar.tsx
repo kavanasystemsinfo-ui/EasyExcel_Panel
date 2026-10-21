@@ -129,7 +129,7 @@ function Topbar({
           onPdf={() => onExportPdf?.()}
         />
         <button type="button" className="btn btn-primary" onClick={onUploadClick}>
-          Cargar .xlsx
+          Cargar archivo
         </button>
         {esDemo ? (
           <span className="chip-user" title="Datos de ejemplo, sin cuenta real">

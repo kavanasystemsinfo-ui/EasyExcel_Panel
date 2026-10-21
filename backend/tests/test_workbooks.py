@@ -86,8 +86,8 @@ def test_carga_rechaza_archivo_que_no_es_zip(client):
     assert resp.status_code == 400
 
 
-def test_carga_rechaza_extension_xls(client, xlsx_2_hojas):
-    resp = upload(client, xlsx_2_hojas, filename="viejo.xls")
+def test_carga_rechaza_extension_desconocida(client, xlsx_2_hojas):
+    resp = upload(client, xlsx_2_hojas, filename="viejo.docx")
     assert resp.status_code == 400
 
 

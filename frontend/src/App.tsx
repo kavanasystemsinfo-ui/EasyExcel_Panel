@@ -455,7 +455,7 @@ function App() {
             <p>
               {demoCargando
                 ? 'Cargando el libro demo…'
-                : 'Sube un .xlsx, explora sus hojas y trabaja con sus datos en el navegador.'}
+                : 'Sube un .xlsx, .xls, .ods o .csv, explora sus hojas y trabaja con sus datos en el navegador.'}
             </p>
           </div>
         </header>
@@ -537,7 +537,7 @@ function App() {
                 Nueva columna
               </button>
               <button type="button" className="btn btn-primary" onClick={abrirSelector}>
-                Cargar .xlsx
+                Cargar archivo
               </button>
             </div>
           </section>
@@ -662,7 +662,7 @@ function App() {
         ref={fileRef}
         type="file"
         hidden
-        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        accept=".xlsx,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,text/csv"
         onChange={(event) => {
           const file = event.target.files?.[0]
           if (file) void handleFile(file)

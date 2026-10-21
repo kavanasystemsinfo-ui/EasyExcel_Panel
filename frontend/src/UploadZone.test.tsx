@@ -17,13 +17,24 @@ describe('UploadZone', () => {
     expect(onFile).toHaveBeenCalledWith(expect.any(File))
   })
 
-  it('rechaza en cliente archivos que no son .xlsx', () => {
+  it.each(['datos.xls', 'datos.ods', 'datos.csv'])(
+    'permite seleccionar un %s y avisa al padre',
+    (nombre) => {
+      const onFile = vi.fn()
+      render(<UploadZone onFile={onFile} busy={false} error={null} />)
+      const input = screen.getByLabelText(/archivo excel/i)
+      fireEvent.change(input, { target: { files: [makeFile(nombre)] } })
+      expect(onFile).toHaveBeenCalledWith(expect.any(File))
+    },
+  )
+
+  it('rechaza en cliente archivos con otra extensión', () => {
     const onFile = vi.fn()
     render(<UploadZone onFile={onFile} busy={false} error={null} />)
     const input = screen.getByLabelText(/archivo excel/i)
-    fireEvent.change(input, { target: { files: [makeFile('datos.xls')] } })
+    fireEvent.change(input, { target: { files: [makeFile('datos.pdf')] } })
     expect(onFile).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent(/\.xlsx/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/formato no soportado/i)
   })
 
   it('procesa el arrastre sobre la zona', () => {

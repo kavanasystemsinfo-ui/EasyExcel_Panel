@@ -6,13 +6,17 @@ type Props = {
   error: string | null
 }
 
+const EXTENSIONES = ['.xlsx', '.xls', '.ods', '.csv']
+const ACCEPT = '.xlsx,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,text/csv'
+
 function UploadZone({ onFile, busy, error }: Props) {
   const [inputError, setInputError] = useState<string | null>(null)
 
   function aceptar(file: File | undefined | null): string | null {
     if (!file || busy) return null
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      return 'Formato no soportado: sube un archivo .xlsx (no .xls ni .csv).'
+    const nombre = file.name.toLowerCase()
+    if (!EXTENSIONES.some((ext) => nombre.endsWith(ext))) {
+      return 'Formato no soportado: sube un .xlsx, .xls, .ods o .csv.'
     }
     onFile(file)
     return null
@@ -44,13 +48,13 @@ function UploadZone({ onFile, busy, error }: Props) {
         </span>
         <h2>¿Por dónde empezamos?</h2>
         <p className="upload-sub">
-          Arrastra aquí tu archivo <strong>.xlsx</strong> o selecciónalo desde tu equipo.
+          Arrastra aquí tu archivo <strong>.xlsx, .xls, .ods o .csv</strong> o selecciónalo desde tu equipo.
         </p>
         <label className="btn btn-primary upload-pick">
           {busy ? 'Cargando…' : 'Elegir archivo'}
           <input
             type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept={ACCEPT}
             aria-label="Archivo Excel"
             disabled={busy}
             onChange={handleInput}
