@@ -114,7 +114,7 @@ def test_carga_rechaza_hojas_vacias_del_todo(client):
     data = make_xlsx({"Vacia": []})
     resp = upload(client, data)
     assert resp.status_code == 201
-    assert resp.json()["sheets"] == [{"name": "Vacia", "rows": 0, "cols": 0}]
+    assert resp.json()["sheets"] == [{"name": "Vacia", "rows": 0, "cols": 0, "header": [], "data": []}]
 
 
 # ------------------------------------------------------------- inventario

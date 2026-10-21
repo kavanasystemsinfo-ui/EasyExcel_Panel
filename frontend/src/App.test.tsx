@@ -2,11 +2,22 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-const workbook = {
+const workbookFull = {
   id: 'abc123',
   filename: 'demo.xlsx',
   uploaded_at: '2026-10-05T00:00:00+00:00',
-  sheets: [{ name: 'Ventas', rows: 2, cols: 2 }],
+  sheets: [
+    {
+      name: 'Ventas',
+      rows: 2,
+      cols: 2,
+      header: ['Producto', 'Unidades'],
+      data: [
+        ['Sofa', 3],
+        ['Mesa', 1],
+      ],
+    },
+  ],
 }
 
 const sheetRows = {
@@ -45,10 +56,7 @@ describe('App', () => {
     const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
       const href = String(url)
       if (href.endsWith('/api/v1/workbooks') && init?.method === 'POST') {
-        return Promise.resolve(jsonResponse(workbook, 201))
-      }
-      if (href.includes('/sheets/Ventas/rows')) {
-        return Promise.resolve(jsonResponse(sheetRows))
+        return Promise.resolve(jsonResponse(workbookFull, 201))
       }
       return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
     })
@@ -136,10 +144,7 @@ describe('App con demo automatica (Fase 3)', () => {
     const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
       const href = String(url)
       if (href.endsWith('/api/v1/workbooks') && init?.method === 'POST') {
-        return Promise.resolve(jsonResponse(workbook, 201))
-      }
-      if (href.includes('/sheets/Ventas/rows')) {
-        return Promise.resolve(jsonResponse(sheetRows))
+        return Promise.resolve(jsonResponse(workbookFull, 201))
       }
       return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
     })
@@ -174,33 +179,30 @@ describe('App con demo automatica (Fase 3)', () => {
 })
 
 describe('Libro generico (cualquier Excel)', () => {
-  const ventasManifest = {
+  const ventasFull = {
     id: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
     filename: 'informe_ventas.xlsx',
     uploaded_at: '2026-10-21T10:00:00+00:00',
-    sheets: [{ name: 'Ventas', rows: 3, cols: 4 }],
-  }
-  const ventasRows = {
-    sheet: 'Ventas',
-    header: ['ID', 'Cliente', 'Importe', 'Estado'],
-    rows: [
-      [1, 'Acme', 120.5, 'Pagado'],
-      [2, 'Beta', 80, 'Pendiente'],
-      [3, 'Acme', 200, 'Pagado'],
+    sheets: [
+      {
+        name: 'Ventas',
+        rows: 3,
+        cols: 4,
+        header: ['ID', 'Cliente', 'Importe', 'Estado'],
+        data: [
+          [1, 'Acme', 120.5, 'Pagado'],
+          [2, 'Beta', 80, 'Pendiente'],
+          [3, 'Acme', 200, 'Pagado'],
+        ],
+      },
     ],
-    total: 3,
-    offset: 0,
-    limit: 100,
   }
 
   function mockGenerico() {
     const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
       const href = String(url)
       if (href.endsWith('/api/v1/workbooks') && init?.method === 'POST') {
-        return Promise.resolve(jsonResponse(ventasManifest, 201))
-      }
-      if (href.includes('/sheets/Ventas/rows')) {
-        return Promise.resolve(jsonResponse(ventasRows))
+        return Promise.resolve(jsonResponse(ventasFull, 201))
       }
       return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
     })

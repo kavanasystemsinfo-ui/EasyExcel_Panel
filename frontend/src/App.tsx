@@ -225,9 +225,15 @@ function App() {
     setRowsError(null)
     setAvisoLocal(null)
     try {
-      const manifest = await uploadWorkbook(file)
+      const full = await uploadWorkbook(file)
       borrarSesion()
-      instalar(await cargarHojas(manifest), 'datos')
+      const wbFull: WorkbookFull = {
+        id: full.id,
+        filename: full.filename,
+        uploaded_at: full.uploaded_at,
+        hojas: full.sheets.map((s) => ({ name: s.name, header: s.header, rows: s.data })),
+      }
+      instalar(wbFull, 'datos')
     } catch (error: unknown) {
       setUploadError(messageOf(error, 'No se pudo cargar el archivo'))
     } finally {

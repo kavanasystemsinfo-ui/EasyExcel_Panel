@@ -48,10 +48,16 @@ def _resolve_id(workbook_id: str) -> str:
     return DEMO_ID
 
 
-@router.post("", response_model=WorkbookOut, status_code=201)
+@router.post("", status_code=201)
 async def upload_workbook(
     file: Annotated[UploadFile, File(...)],
 ) -> dict:
+    """Sube un .xlsx y devuelve el libro completo (metadatos + filas).
+
+    Devuelve las filas en la misma respuesta del upload para evitar
+    requests posteriores que en Vercel serverless caen en otra instancia
+    sin acceso al /tmp de la subida (problema de efimeridad).
+    """
     filename = file.filename or ""
     if not filename.lower().endswith(".xlsx"):
         raise InvalidWorkbookError("Solo se admiten archivos .xlsx")
@@ -64,11 +70,25 @@ async def upload_workbook(
     storage = _storage()
     workbook_id = storage.save_book(data)
     try:
-        sheets: list[dict] = excel_parser.extract_metadata(storage.book_path(workbook_id))
+        book_path = storage.book_path(workbook_id)
+        sheets_meta: list[dict] = excel_parser.extract_metadata(book_path)
+        sheets_full: list[dict] = []
+        for s in sheets_meta:
+            payload = excel_parser.read_rows(book_path, s["name"], 0, s["rows"] or 1)
+            sheets_full.append(
+                {
+                    "name": s["name"],
+                    "rows": s["rows"],
+                    "cols": s["cols"],
+                    "header": payload.get("header", []),
+                    "data": payload.get("rows", []),
+                }
+            )
     except Exception:
         storage.delete(workbook_id)
         raise
-    return storage.finalize(workbook_id, filename, sheets)
+    manifest = storage.finalize(workbook_id, filename, sheets_meta)
+    return {**manifest, "sheets": sheets_full}
 
 
 @router.get("", response_model=list[WorkbookListItem])

@@ -23,6 +23,15 @@ class WorkbookOut(WorkbookListItem):
     sheets: list[SheetInfo]
 
 
+class SheetDataOut(SheetInfo):
+    header: list[str] = Field(default_factory=list)
+    data: list[list[object]] = Field(default_factory=list)
+
+
+class WorkbookFullOut(WorkbookListItem):
+    sheets: list[SheetDataOut]
+
+
 class SheetRows(BaseModel):
     sheet: str
     header: list[str]

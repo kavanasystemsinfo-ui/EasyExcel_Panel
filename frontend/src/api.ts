@@ -4,11 +4,20 @@ export type SheetInfo = {
   cols: number
 }
 
+export type SheetData = SheetInfo & {
+  header: string[]
+  data: unknown[][]
+}
+
 export type Workbook = {
   id: string
   filename: string
   uploaded_at: string
   sheets: SheetInfo[]
+}
+
+export type WorkbookFullResponse = Omit<Workbook, 'sheets'> & {
+  sheets: SheetData[]
 }
 
 export type SheetRows = {
@@ -43,10 +52,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export function uploadWorkbook(file: File): Promise<Workbook> {
+export function uploadWorkbook(file: File): Promise<WorkbookFullResponse> {
   const form = new FormData()
   form.append('file', file)
-  return request<Workbook>('/api/v1/workbooks', { method: 'POST', body: form })
+  return request<WorkbookFullResponse>('/api/v1/workbooks', { method: 'POST', body: form })
 }
 
 export function getSheetRows(
