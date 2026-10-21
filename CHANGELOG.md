@@ -5,6 +5,7 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
+- **Migración a Render con disco persistente** (21/10/2026): backend `easyexcel-backend.onrender.com` con disco 1GB montado en `/var/data`, variable `EASYEXCEL_UPLOAD_DIR=/var/data/uploads`. Frontend `easyexcel-frontend.onrender.com` estático con proxy `/api/*` → backend. Dominio propio `easyexcel.kavanasystems.com` verificado y sirviendo desde Render con certificado SSL. Los Excel subidos ya no se pierden al reiniciar la instancia.
 - **Visualización genérica para cualquier Excel** (commit `ce3f218`): el panel ya no está atado al dominio de Personal/Operaciones. Sube cualquier `.xlsx` y genera automáticamente KPIs, gráficos, alertas y sugerencias del copiloto a partir de la estructura real de las hojas (columnas id, numéricas, categóricas y de fecha detectadas por nombre y contenido). El demo conserva su pipeline específico con 4 secciones; los libros genéricos muestran Resumen + Datos.
 - Módulo `frontend/src/insights.ts` con inferencia de insights (29 tests unitarios).
 - Props opcionales en `KpiCards`, `Alertas`, `CopilotPanel`, `Topbar` y `Sidebar` para soportar ambos modos sin romper el demo.
