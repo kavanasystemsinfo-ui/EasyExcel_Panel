@@ -24,7 +24,12 @@ async def copiloto(payload: CopilotoPayload, request: Request) -> Any:
             status_code=503,
         )
 
-    ip = request.client.host if request.client else "anonimo"
+    # Detras del proxy de Render request.client.host es la IP del propio
+    # proxy: sin X-Forwarded-For todos los usuarios compartiran un solo cubo.
+    xff = request.headers.get("x-forwarded-for", "")
+    ip = xff.split(",")[0].strip() if xff else (
+        request.client.host if request.client else "anonimo"
+    )
     try:
         assistant.comprobar_rate(ip)
     except assistant.RateLimitError as exc:

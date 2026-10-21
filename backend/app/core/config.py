@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     nvidia_models: str = "google/gemma-4-31b-it"
     copiloto_max_tokens: int = 1500
     copiloto_timeout_s: float = 90.0
-    copiloto_rate_limit: int = 40
-    copiloto_rate_window_s: int = 600
+    copiloto_rate_limit: int = 20
+    copiloto_rate_window_s: int = 86400
     copiloto_cache_size: int = 200
     copiloto_context_max_chars: int = 60_000
 

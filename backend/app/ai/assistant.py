@@ -97,8 +97,11 @@ def comprobar_rate(ip: str) -> None:
     marcas = [t for t in _ventanas.get(ip, []) if ahora - t < ventana]
     if len(marcas) >= settings.copiloto_rate_limit:
         _ventanas[ip] = marcas
+        espera = (
+            f"{ventana // 3600} horas" if ventana >= 3600 else f"{ventana // 60} minutos"
+        )
         raise RateLimitError(
-            f"Demasiadas consultas al copiloto. Vuelve a intentarlo en {ventana // 60} minutos."
+            f"Demasiadas consultas al copiloto. Vuelve a intentarlo en {espera}."
         )
     marcas.append(ahora)
     _ventanas[ip] = marcas

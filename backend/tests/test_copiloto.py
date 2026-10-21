@@ -144,6 +144,45 @@ def test_rate_limit_devuelve_429(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.post("/api/v1/copiloto", json=_cuerpo()).status_code == 429
 
 
+def test_rate_limit_default_veinte_al_dia() -> None:
+    assert settings.copiloto_rate_limit == 20
+    assert settings.copiloto_rate_window_s == 86400
+
+
+def test_rate_limit_mensaje_en_horas(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(assistant.settings, "copiloto_rate_limit", 1)
+    monkeypatch.setattr(assistant, "_stream_chat", _fake_stream())
+    client.post("/api/v1/copiloto", json=_cuerpo())
+    response = client.post("/api/v1/copiloto", json=_cuerpo())
+    assert response.status_code == 429
+    assert "24 horas" in response.json()["detail"]
+
+
+def test_rate_limit_separado_por_ip_x_forwarded_for(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(assistant.settings, "copiloto_rate_limit", 1)
+    monkeypatch.setattr(assistant, "_stream_chat", _fake_stream())
+    primera = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "203.0.113.9"},
+    )
+    repetida = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "203.0.113.9"},
+    )
+    otra_ip = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "203.0.113.10"},
+    )
+    assert primera.status_code == 200
+    assert repetida.status_code == 429
+    assert otra_ip.status_code == 200
+
+
 def test_cache_evita_segunda_llamada_al_proveedor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
