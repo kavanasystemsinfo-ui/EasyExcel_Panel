@@ -56,7 +56,8 @@ ADR de [`docs/adr/`](docs/adr/): [0001 stack](docs/adr/0001-stack-y-arquitectura
 [0003 sesión local](docs/adr/0003-sesion-local-demo.md) ·
 [0004 subidas con TTL](docs/adr/0004-subidas-efimeras-ttl.md) ·
 [0005 formatos de entrada](docs/adr/0005-formatos-entrada-xls-ods-csv.md) ·
-[0006 rate limit del copiloto](docs/adr/0006-copiloto-rate-limit-20-dia.md).
+[0006 rate limit del copiloto](docs/adr/0006-copiloto-rate-limit-20-dia.md) ·
+[0007 acceso abierto sin auth](docs/adr/0007-acceso-abierto-sin-autenticacion.md).
 
 ### Asistente IA (modelos gratuitos)
 
@@ -275,7 +276,10 @@ Documentación transversal: [ARCHITECTURE.md](ARCHITECTURE.md) (diagrama y lími
      `/api`), dominio propio `easyexcel.kavanasystems.com`, CI en verde y
      auditoría de seguridad y documentación (22/10/2026)
 8. **Fase 8** — Autenticación y multiusuario (pendiente; JWT + RLS cuando
-   haya base de datos, ADR-0001)
+   haya base de datos, ADR-0001). Hasta entonces la demo queda abierta sin
+   auth por decisión registrada en el
+   [ADR-0007](docs/adr/0007-acceso-abierto-sin-autenticacion.md), con las
+   mitigaciones por IP ya en producción.
 
 ## Nota de privacidad
 
