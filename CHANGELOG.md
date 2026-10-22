@@ -16,6 +16,19 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 - 3 tests de integración de `App` con libro genérico (subida, KPIs en Resumen, sidebar reducido).
 
 ### Fixed
+- **XSS en el panel del copiloto**: el escape de `renderRespuesta` era inópera (reemplazaba `<` por `<`, `&` por `&`), así que cualquier HTML que el modelo reprodujera — p. ej. de una celda maliciosa de un Excel compartido — llegaba vivo al `dangerouslySetInnerHTML` del panel. El render se ha movido a `frontend/src/copilotRender.ts`, escapa `&`, `<` y `>` antes de aplicar markdown, y hay tests de DOM que verifican que ningún `<img onerror=...>` se inyecta (197 tests frontend).
+- **Rate limit del copiloto a prueba de spoofing**: la IP ahora sale de la **última** posición de `X-Forwarded-For` (la que añade el proxy de Render); antes se usaba la primera, que la controla el cliente, con lo que el límite de 20 consultas/día se evadía cambiando el header. Añadida cota de memoria `_MAX_IPS = 10.000` con purga de ventanas caducadas (antes el mapa crecía sin límite). 2 tests nuevos (RED→GREEN).
+- **Upload con lectura acotada**: el body se lee por bloques de 1 MB y se corta en el primer MB que desborda el límite de 10 MB; antes `file.read()` materializaba el body completo en memoria antes del 413.
+- **CI verde en `main`** (59 runs rojos seguidos desde el 08/10): ruff de 38 errores a 0 (orden de imports, líneas del generador demo reenvueltas sin cambiar el dataset, `raise ... from`, variable sin uso), mypy arreglado de raíz (`explicit_package_bases` + borrado de `backend/__init__.py`, guard de `sys.platform` para `SIGALRM`, `list[Any]` en las filas del demo), y `xlrd`/`odfpy` añadidos a `pyproject.toml`: el CI instala `.[dev]` y el parser importa esos paquetes a nivel de módulo, así que el job backend no podía pasar de los checks.
+- **Test de timeout que no podía fallar**: `assert resp.status_code in (201, 422)` siempre se cumplía; sustituido por tests directos de `_run_with_timeout` (dispara `WorkbookParseTimeoutError` en Unix, ejecuta sin timeout en Windows).
+- **Referencias muertas a Vercel**: rama `IS_VERCEL` fuera de `config.py`, comentario de Vercel fuera del docstring del upload y del docstring del parser.
+
+### Removed
+- `GET /api/v1/demo-data`: endpoint sin uso (lo consumía `default_demo.xlsx`, que solo existía para él) cuyo 404 devolvía un `os.listdir` del filesystem del servidor.
+- Basura de raíz y restos de Vercel: `get-pip.py` (2,2 MB), `trigger.txt`, `update_readme.py`, `vercel.json`, `frontend/build.sh`, copias sin uso de `easyexcel_demo.xlsx` (raíz y `backend/data/`), `backend/data/default_demo.xlsx`, `mangum` de `requirements.txt`.
+- `backend/__init__.py` (rompía mypy con "source file found twice"; `app` ya es paquete).
+
+### Changed
 - **Subida de archivos en Vercel serverless** (commit `20ef469`): el endpoint `POST /api/v1/workbooks` ahora devuelve las filas parseadas (header + data de todas las hojas) en la misma respuesta del upload. Antes, el frontend hacía GETs posteriores por hoja que en serverless caían en otra instancia sin acceso al `/tmp` efímero de la subida y devolvían 404, dejando el grid vacío.
 - Test rojo `test_demo_filas_reales`: ajustado a las 50 filas reales del generador demo (esperaba 215).
 

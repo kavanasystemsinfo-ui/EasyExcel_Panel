@@ -1,5 +1,7 @@
 # EasyExcel Panel
 
+[![CI](https://github.com/kavanasystemsinfo-ui/EasyExcel_Panel/actions/workflows/ci.yml/badge.svg)](https://github.com/kavanasystemsinfo-ui/EasyExcel_Panel/actions/workflows/ci.yml)
+
 **Dashboard de gestión sobre Excel para entornos donde el Excel es la base de datos.**
 
 Caso de uso real que originó el proyecto: un encargado de personal de limpieza gestiona
