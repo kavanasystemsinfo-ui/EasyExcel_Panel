@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +18,17 @@ from app.errors import (
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, version=settings.version)
+    if settings.docs_enabled is not None:
+        docs_activos = settings.docs_enabled
+    else:
+        # En Render (RENDER=true) la API es publica: sin Swagger abierto.
+        docs_activos = not os.environ.get("RENDER")
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.version,
+        docs_url="/docs" if docs_activos else None,
+        openapi_url="/openapi.json" if docs_activos else None,
+    )
     if not assistant.logger.handlers:
         log_handler = logging.StreamHandler()
         log_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))

@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # /docs y /openapi.json: None = automatico (activos en local, desactivados
+    # en Render, donde la variable RENDER=true); true/false fuerza el valor.
+    docs_enabled: bool | None = None
+
     # Limites de seguridad para la carga de Excel (ADR-0001)
     max_upload_mb: int = 10
     max_sheets: int = 50

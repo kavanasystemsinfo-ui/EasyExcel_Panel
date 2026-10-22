@@ -1,0 +1,21 @@
+# Dependabot: actualizaciones automaticas semanales con PRs, para que las
+# dependencias no se queden con CVEs conocidos (criterio de seguridad de ADR-0001).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

@@ -55,7 +55,8 @@ services:
     name: easyexcel-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    # npm ci: instalacion reproducible desde el package-lock (mismo codigo en CI y en deploy)
+    buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     # Dominio propio del panel. Con este proxy, el navegador llama a
     # /api/... en el mismo origen y el proxy lo reenvia al backend.
@@ -67,3 +68,12 @@ services:
       - path: /*
         name: X-Frame-Options
         value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()

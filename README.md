@@ -21,7 +21,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 |---|---|
 | Demo en vivo en producción (Render + dominio propio) | **DESPLEGADO** (<https://easyexcel.kavanasystems.com>) |
 | Dataset demo del servidor (9 hojas de negocio + Info, semilla fija) | **VERIFICADO** |
-| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (66 tests pytest + smoke con el dataset real) |
+| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (70 tests pytest + smoke con el dataset real) |
 | Parsing multi-formato (.xlsx/.xls/.ods/.csv) aislado en subproceso con timeout y límites | **VERIFICADO** (ADR-0005) |
 | Subidas efímeras con caducidad de 2 h | **VERIFICADO** (ADR-0004, tests de purga) |
 | UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (suite frontend: 197 tests Vitest) |
@@ -109,6 +109,8 @@ Cualquiera con el enlace puede verlo y descargarlo como `.xlsx`; nadie puede edi
 | Copiloto | 20/día por IP, caché 200, sin claves → 503 |
 | HTML del copiloto | todo el texto del modelo se escapa antes del markdown (`frontend/src/copilotoRender.ts`) |
 | CORS | en producción todo es mismo origen vía proxy `/api`; allowlist explícita en dev |
+| Swagger | `/docs` y `/openapi.json` **desactivados en Render** (activos en local; `EASYEXCEL_DOCS_ENABLED` fuerza el valor) |
+| Dependencias | Dependabot semanal (pip, npm, github-actions) + `npm audit` sin vulnerabilidades |
 | Datos | **100 % sintéticos**; sin autenticación todavía: no subir información real |
 
 ## Datasets
@@ -175,7 +177,7 @@ Salida esperada de la verificación: `READ-BACK OK: xlsx reabierto, 0 errores de
 cd backend
 pip install -e ".[dev]"
 uvicorn app.main:app --reload        # API en http://localhost:8000
-ruff check . && mypy app && pytest   # verificaciones (66 tests)
+ruff check . && mypy app && pytest   # verificaciones (70 tests)
 
 # Frontend (Node 24+) — con el backend levantado (proxy /api -> :8000 en dev)
 cd frontend
@@ -184,11 +186,13 @@ npm run dev                          # UI en http://localhost:5173
 npm run lint && npm test && npm run build   # oxlint + 197 tests + build
 ```
 
-La documentación OpenAPI se genera automáticamente en `/docs` y `/openapi.json`.
+La documentación OpenAPI se genera en `/docs` y `/openapi.json` **en local**;
+en producción (Render) está desactivada por seguridad.
 
 En CI (GitHub Actions) los mismos mandatos corren en cada push y PR: `ruff` +
 `mypy` + `pytest` para el backend, `oxlint` + `vitest` + `build` para el
-frontend.
+frontend. Dependabot abre PRs semanales de actualización para pip, npm y
+github-actions.
 
 ## Estructura
 
@@ -198,7 +202,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/ai/        cadena de proveedores del copiloto, rate limit y caché
   app/core/      configuración, storage (FS + manifest) y generador del demo
   app/domain/    excel_parser (multi-formato, subproceso con timeout)
-  tests/         pytest (66 tests)
+  tests/         pytest (70 tests)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/edit.ts         motor de edición de hojas (puro, con límites)
   src/session.ts      sesión local por visitante (sessionStorage, se borra al cerrar)
@@ -212,7 +216,8 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
 ```
 
 Documentación transversal: [ARCHITECTURE.md](ARCHITECTURE.md) (diagrama y límites),
-[CHANGELOG.md](CHANGELOG.md) (historia) y [LICENSE](LICENSE) (MIT).
+[CHANGELOG.md](CHANGELOG.md) (historia), [CONTRIBUTING.md](CONTRIBUTING.md)
+(cómo contribuir) y [LICENSE](LICENSE) (MIT).
 
 ## Roadmap
 
