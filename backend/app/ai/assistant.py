@@ -63,6 +63,10 @@ class RateLimitError(Exception):
 _ventanas: dict[str, list[float]] = {}
 _cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
+# Cota de memoria del mapa de rate limit: las IPs no suelen crecer más que
+# esto en una ventana; al superarse se purgan las ventanas ya caducadas.
+_MAX_IPS = 10_000
+
 
 def proveedores_configurados() -> list[Proveedor]:
     proveedores: list[Proveedor] = []
@@ -94,6 +98,14 @@ def _modelos(cadena: str) -> list[str]:
 def comprobar_rate(ip: str) -> None:
     ahora = time.monotonic()
     ventana = settings.copiloto_rate_window_s
+    if len(_ventanas) > _MAX_IPS:
+        caducadas = [
+            clave
+            for clave, marcas in _ventanas.items()
+            if not marcas or ahora - max(marcas) >= ventana
+        ]
+        for clave in caducadas:
+            del _ventanas[clave]
     marcas = [t for t in _ventanas.get(ip, []) if ahora - t < ventana]
     if len(marcas) >= settings.copiloto_rate_limit:
         _ventanas[ip] = marcas

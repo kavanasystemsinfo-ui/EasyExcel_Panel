@@ -1,6 +1,7 @@
 """Tests del endpoint del copiloto IA (modelos gratuitos conmutable)."""
 
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -181,6 +182,42 @@ def test_rate_limit_separado_por_ip_x_forwarded_for(
     assert primera.status_code == 200
     assert repetida.status_code == 429
     assert otra_ip.status_code == 200
+
+
+def test_rate_limit_usa_la_ultima_ip_del_x_forwarded_for(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La IP real la añade el proxy al final: la primera posición la controla el cliente."""
+    monkeypatch.setattr(assistant.settings, "copiloto_rate_limit", 1)
+    monkeypatch.setattr(assistant, "_stream_chat", _fake_stream())
+    spoof1 = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "198.51.100.1, 203.0.113.9"},
+    )
+    spoof2 = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "198.51.100.2, 203.0.113.9"},
+    )
+    otra_real = client.post(
+        "/api/v1/copiloto",
+        json=_cuerpo(),
+        headers={"X-Forwarded-For": "198.51.100.3, 203.0.113.10"},
+    )
+    assert spoof1.status_code == 200
+    assert spoof2.status_code == 429
+    assert otra_real.status_code == 200
+
+
+def test_rate_limit_purga_ventanas_caducadas() -> None:
+    """El mapa de cubos no crece sin límite: las ventanas caducadas se eliminan."""
+    assistant._ventanas.clear()
+    vieja = time.monotonic() - 999_999
+    for i in range(assistant._MAX_IPS + 1):
+        assistant._ventanas[f"ip-{i}"] = [vieja]
+    assistant.comprobar_rate("nueva.ip")
+    assert len(assistant._ventanas) == 1
 
 
 def test_cache_evita_segunda_llamada_al_proveedor(

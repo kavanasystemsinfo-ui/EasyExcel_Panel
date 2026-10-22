@@ -74,11 +74,11 @@ def client():
 
 
 CSV_SEMICOLON = (
-    "Producto;Unidades;Importe;Fecha\n"
-    "Sofa;3;450,5;15/01/2026\n"
-    "Mesa;1;120;20/02/2026\n"
-    "Silla;10;300,75;01/03/2026\n"
-).encode("utf-8")
+    b"Producto;Unidades;Importe;Fecha\n"
+    b"Sofa;3;450,5;15/01/2026\n"
+    b"Mesa;1;120;20/02/2026\n"
+    b"Silla;10;300,75;01/03/2026\n"
+)
 
 CSV_COMMA = (
     "Producto,Unidades,Importe\n"

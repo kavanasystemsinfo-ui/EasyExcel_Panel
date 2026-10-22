@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { copilotoStream } from './api'
+import { renderRespuesta } from './copilotRender'
 
 const SUGERENCIAS = [
   '¿Cómo va el día?',
@@ -18,18 +19,6 @@ const SUGERENCIAS_GENERICAS = [
   '¿Qué columnas numéricas hay?',
   'Dame 3 conclusiones',
 ]
-
-/** Render minimalista de markdown para respuestas del copiloto: **negrita**, *cursiva*, listas. */
-function renderRespuesta(texto: string): string {
-  const escachado = texto
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-  return escachado
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
-    .replace(/\n/g, '<br/>')
-}
 
 type Props = {
   contexto: unknown

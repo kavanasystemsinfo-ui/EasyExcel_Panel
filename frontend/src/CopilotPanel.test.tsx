@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import CopilotPanel from './CopilotPanel'
+import { renderRespuesta } from './copilotRender'
 
 const contexto = { hoja: 'Empleados', kpis: { total: 215 } }
 
@@ -204,6 +205,44 @@ describe('CopilotPanel', () => {
     const input = screen.getByLabelText(/pregunta al copiloto/i)
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('escapa el HTML crudo de la respuesta', () => {
+    const html = renderRespuesta('<img src=x onerror="alert(1)"> y & <b>negrita</b>')
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('<b>')
+    expect(html).toContain('&lt;img')
+    expect(html).toContain('&amp;')
+    expect(html).toContain('&lt;b&gt;')
+  })
+
+  it('sigue renderizando el markdown tras escapar', () => {
+    const html = renderRespuesta('**fuerte** y *cursiva* y linea1\nlinea2')
+    expect(html).toContain('<strong>fuerte</strong>')
+    expect(html).toContain('<em>cursiva</em>')
+    expect(html).toContain('<br/>')
+  })
+
+  it('no inyecta HTML del modelo en el DOM del panel', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          sseResponse([
+            { t: 'delta', c: '<img src=x onerror="window.__pwned=1">' },
+            { t: 'fin', proveedor: 'openrouter', modelo: 'm', cache: false },
+          ]),
+        ),
+      ),
+    )
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} />)
+    const input = screen.getByLabelText(/pregunta al copiloto/i)
+    fireEvent.change(input, { target: { value: 'hola' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const respuesta = await screen.findByRole('status')
+    await waitFor(() => expect(respuesta.textContent).toContain('<img'))
+    expect(respuesta.querySelector('img')).toBeNull()
+    expect((window as { __pwned?: number }).__pwned).toBeUndefined()
   })
 })
 

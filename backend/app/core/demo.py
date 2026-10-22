@@ -1,10 +1,11 @@
 """Workbook demo publico: se siembra bajo demanda y es de solo lectura."""
 
 import hashlib
+import random
 from datetime import date, timedelta
 from io import BytesIO
 from pathlib import Path
-import random
+from typing import Any
 
 from openpyxl import Workbook
 
@@ -19,27 +20,45 @@ DEMO_ID = hashlib.sha256(b"easyexcel:demo:v6").hexdigest()[:32]
 def _generate_metalurgica_demo() -> bytes:
     """Genera el Excel demo de metalúrgica programáticamente."""
     random.seed(20261020)
-    
+
     CATEGORIAS = ["Encargado", "Tecnico", "Operario", "Mantenimiento"]
     TIPOS_CONTRATO = ["Indefinido", "Temporal", "Fijo Discontinuo", "Practicas"]
     JORNADAS = ["Completa", "Parcial", "Turno Día", "Turno Noche"]
     ZONAS = ["Producción", "Mantenimiento", "Almacén", "Oficina", "QC", "Investigación"]
-    ESTADOS = ["Activo", "Baja", "IT", "Vacaciones", "Formación"]
-    
+
     OBS_OPTIONS = [
         "Disponible fines semana",
         "Experiencia hospital",
         "Requiere altura",
         "",
-        "Mantenimiento especiales"
+        "Mantenimiento especiales",
     ]
-    
+
     # Empleados (50)
-    empleados = []
+    empleados: list[list[Any]] = []
     for i in range(1, 51):
         emp_id = f"EMP{i:03d}"
-        nombre = random.choice(["Mario", "Juan", "Pedro", "Luis", "David", "Carlos", "Miguel", "Antonio", "José", "Francisco"]) + " " + random.choice(["Garcia", "Lopez", "Fernandez", "Rodriguez", "Gonzalez"])
-        dni = f"{random.randint(10000000, 99999999)}{'TRWAGMYFPDXBNJZSQVHLCKE'[random.randint(0,22)]}"
+        nombre = (
+            random.choice(
+                [
+                    "Mario",
+                    "Juan",
+                    "Pedro",
+                    "Luis",
+                    "David",
+                    "Carlos",
+                    "Miguel",
+                    "Antonio",
+                    "José",
+                    "Francisco",
+                ]
+            )
+            + " "
+            + random.choice(["Garcia", "Lopez", "Fernandez", "Rodriguez", "Gonzalez"])
+        )
+        numero_dni = random.randint(10000000, 99999999)
+        letra_dni = "TRWAGMYFPDXBNJZSQVHLCKE"[random.randint(0, 22)]
+        dni = f"{numero_dni}{letra_dni}"
         telefono = f"96{random.randint(1000000, 9999999)}"
         email = f"{nombre.lower().replace(' ', '.')}@metalurgica.com"
         categoria = random.choice(CATEGORIAS)
@@ -58,21 +77,78 @@ def _generate_metalurgica_demo() -> bytes:
         estado = random.choice(["Activo", "Activo", "Activo", "Baja", "IT"])
         observaciones = random.choice(OBS_OPTIONS)
         foto_url = f"https://metalurgica.com/fotos/empleados/{emp_id}.jpg"
-        empleados.append([emp_id, nombre, dni, telefono, email, categoria, tipo_contrato, jornada, fecha_alta, fecha_baja, centro_coste, zona_asignada, turno_habitual, horas_semanales, salario_base, plus_turnicidad, plus_nocturnidad, plus_penosidad, estado, observaciones, foto_url])
+        empleados.append(
+            [
+                emp_id,
+                nombre,
+                dni,
+                telefono,
+                email,
+                categoria,
+                tipo_contrato,
+                jornada,
+                fecha_alta,
+                fecha_baja,
+                centro_coste,
+                zona_asignada,
+                turno_habitual,
+                horas_semanales,
+                salario_base,
+                plus_turnicidad,
+                plus_nocturnidad,
+                plus_penosidad,
+                estado,
+                observaciones,
+                foto_url,
+            ]
+        )
 
     # Centros (6)
     centros = []
-    nombres_centros = ["Fábrica Norte", "Fábrica Sur", "Planta Central", "Almacén Principal", "Oficina Central", "QC Industrial"]
+    nombres_centros = [
+        "Fábrica Norte",
+        "Fábrica Sur",
+        "Planta Central",
+        "Almacén Principal",
+        "Oficina Central",
+        "QC Industrial",
+    ]
     for i in range(1, 7):
         centro_id = f"CC{i:02d}"
-        nombre = nombres_centros[i-1]
+        nombre = nombres_centros[i - 1]
         zona = random.choice(ZONAS)
         telefono = f"96{random.randint(1000000, 9999999)}"
-        responsable = random.choice(["Mario García", "Juan Lopez", "Pedro Fernandez", "Luis Rodriguez", "David Gonzalez", "Carlos Martín"]) + " (Metalúrgica)"
+        responsable = (
+            random.choice(
+                [
+                    "Mario García",
+                    "Juan Lopez",
+                    "Pedro Fernandez",
+                    "Luis Rodriguez",
+                    "David Gonzalez",
+                    "Carlos Martín",
+                ]
+            )
+            + " (Metalúrgica)"
+        )
         inicio_servicio = date(2020, 1, 1) + timedelta(days=random.randint(0, 2000))
         superficie_m2 = random.randint(500, 5000)
         plantilla_asignada = random.randint(5, 50)
-        centros.append([centro_id, nombre, "Metalúrgica S.A.", f"Calle Metalúrgica {i}, Parque Industrial", zona, telefono, responsable, inicio_servicio, superficie_m2, plantilla_asignada, "Activo"])
+        centros.append(
+            [
+                centro_id,
+                nombre,
+                "Metalúrgica S.A.",
+                f"Calle Metalúrgica {i}, Parque Industrial",
+                zona,
+                telefono,
+                responsable,
+                inicio_servicio,
+                superficie_m2,
+                plantilla_asignada,
+                "Activo",
+            ]
+        )
 
     # Asignaciones (50 - one per employee)
     asignaciones = []
@@ -80,7 +156,16 @@ def _generate_metalurgica_demo() -> bytes:
         emp_id = emp[0]
         cc = emp[10]
         cc_obj = centros[int(cc[2:]) - 1] if cc[2:] else centros[0]
-        asignaciones.append([emp_id, cc_obj[0], cc_obj[1], date(2024,1,1)+timedelta(days=random.randint(0,365)), random.choice(["Activo", "Inactivo"]), random.randint(1, 50)])
+        asignaciones.append(
+            [
+                emp_id,
+                cc_obj[0],
+                cc_obj[1],
+                date(2024, 1, 1) + timedelta(days=random.randint(0, 365)),
+                random.choice(["Activo", "Inactivo"]),
+                random.randint(1, 50),
+            ]
+        )
 
     # Contratos (50)
     contratos = []
@@ -95,7 +180,16 @@ def _generate_metalurgica_demo() -> bytes:
             fecha_fin = None
         else:
             fecha_fin = None
-        contratos.append([emp_id, tipo, "Metalúrgica S.A.", fecha_ini, fecha_fin, random.choice(["Indefinido", "Definido"])])
+        contratos.append(
+            [
+                emp_id,
+                tipo,
+                "Metalúrgica S.A.",
+                fecha_ini,
+                fecha_fin,
+                random.choice(["Indefinido", "Definido"]),
+            ]
+        )
 
     # Vacaciones (10 employees)
     vacaciones = []
@@ -111,13 +205,30 @@ def _generate_metalurgica_demo() -> bytes:
     # Proveedores (10)
     proveedores = []
     for i in range(1, 11):
-        proveedores.append([f"PROV{i:02d}", f"Compañía Metalúrgica {i}", f"B{random.randint(10000000, 99999999)}", 
-                            random.choice(["Materia prima", "Aceites", "Herramientas", "Componentes", "Energía"]),
-                            f"Contacto {random.choice(['Mario', 'Juan', 'Pedro'])} {random.choice(['Garcia', 'Lopez', 'Fernandez'])}",
-                            f"96{random.randint(1000000, 9999999)}", f"contacto@comp{i}.com",
-                            f"Calle Proveedor {i}, Valencia", "Si",
-                            date(2026, 1, 1) + timedelta(days=random.randint(0, 30)),
-                            random.randint(500, 5000) * 10, random.randint(3, 5)])
+        cif = f"B{random.randint(10000000, 99999999)}"
+        servicio = random.choice(
+            ["Materia prima", "Aceites", "Herramientas", "Componentes", "Energía"]
+        )
+        nombre_contacto = random.choice(["Mario", "Juan", "Pedro"])
+        apellido_contacto = random.choice(["Garcia", "Lopez", "Fernandez"])
+        contacto = f"Contacto {nombre_contacto} {apellido_contacto}"
+        telefono_prov = f"96{random.randint(1000000, 9999999)}"
+        proveedores.append(
+            [
+                f"PROV{i:02d}",
+                f"Compañía Metalúrgica {i}",
+                cif,
+                servicio,
+                contacto,
+                telefono_prov,
+                f"contacto@comp{i}.com",
+                f"Calle Proveedor {i}, Valencia",
+                "Si",
+                date(2026, 1, 1) + timedelta(days=random.randint(0, 30)),
+                random.randint(500, 5000) * 10,
+                random.randint(3, 5),
+            ]
+        )
 
     # Auditorias (30)
     auditorias = []
@@ -140,15 +251,28 @@ def _generate_metalurgica_demo() -> bytes:
         "Revisión preventiva adelantada y etiquetado",
     ]
     for i in range(30):
-        auditorias.append([f"AUD{i:03d}", f"MAQ{random.randint(1, 50):03d}", 
-                           date(2026, 1, 10) + timedelta(days=random.randint(0, 200)),
-                           random.choice(["Preventiva", "Correctiva", "ITV"]),
-                           random.choice(["Conforme", "Con hallazgos", "No conforme"]),
-                           random.choice(["Elena Sanchis", "Marco Ferrandis", "Laura Bouchar", "Sergio Picó", "Nerea Tortajada"]),
-                           random.randint(5, 35) * 10,
-                           random.choice(hallazgos),
-                           random.choice(acciones),
-                           "Cerrada" if random.random() > 0.3 else "Abierta"])
+        auditorias.append(
+            [
+                f"AUD{i:03d}",
+                f"MAQ{random.randint(1, 50):03d}",
+                date(2026, 1, 10) + timedelta(days=random.randint(0, 200)),
+                random.choice(["Preventiva", "Correctiva", "ITV"]),
+                random.choice(["Conforme", "Con hallazgos", "No conforme"]),
+                random.choice(
+                    [
+                        "Elena Sanchis",
+                        "Marco Ferrandis",
+                        "Laura Bouchar",
+                        "Sergio Picó",
+                        "Nerea Tortajada",
+                    ]
+                ),
+                random.randint(5, 35) * 10,
+                random.choice(hallazgos),
+                random.choice(acciones),
+                "Cerrada" if random.random() > 0.3 else "Abierta",
+            ]
+        )
 
     # Maquinaria (30)
     maquinaria = []
@@ -170,11 +294,27 @@ def _generate_metalurgica_demo() -> bytes:
         compra = date(2018, 1, 1) + timedelta(days=random.randint(0, 3000))
         garantia = date(2020, 1, 1) + timedelta(days=random.randint(0, 1460))
         estado = random.choices(["Operativa", "En mantenimiento", "Baja"], weights=[80, 13, 7])[0]
-        proxima = None if estado == "Baja" else date(2026, 10, 20) + timedelta(days=random.randint(5, 90))
-        m_id = f"MAQ{i+1:03d}"
+        proxima = (
+            None if estado == "Baja" else date(2026, 10, 20) + timedelta(days=random.randint(5, 90))
+        )
+        m_id = f"MAQ{i + 1:03d}"
         proveedor_mant = f"PROV{random.randint(1, 10):02d}"
-        maquinaria.append([m_id, tipo, marca, modelo, f"{marca[:2].upper()}{random.randint(100000, 999999)}", 
-                           random.choice(centros_ids), compra, garantia, coste, estado, proxima, proveedor_mant])
+        maquinaria.append(
+            [
+                m_id,
+                tipo,
+                marca,
+                modelo,
+                f"{marca[:2].upper()}{random.randint(100000, 999999)}",
+                random.choice(centros_ids),
+                compra,
+                garantia,
+                coste,
+                estado,
+                proxima,
+                proveedor_mant,
+            ]
+        )
 
     # Revisiones (20)
     revisiones = []
@@ -192,7 +332,11 @@ def _generate_metalurgica_demo() -> bytes:
             resultado = "Con hallazgos"
         else:
             resultado = "No conforme"
-        tecnico = random.choice(["Mario", "Juan", "Pedro", "Luis", "David"]) + " " + random.choice(["García", "López", "Fernández", "Rodríguez", "González"])
+        tecnico = (
+            random.choice(["Mario", "Juan", "Pedro", "Luis", "David"])
+            + " "
+            + random.choice(["García", "López", "Fernández", "Rodríguez", "González"])
+        )
         costo = random.randint(5, 35) * 10 if tipo != "Preventiva" else 0
         obs_map = {
             "Conforme": "Equipo operativo, sin observaciones",
@@ -200,33 +344,93 @@ def _generate_metalurgica_demo() -> bytes:
             "No conforme": "Equipo parado hasta sustitución de componente principal",
         }
         observaciones = obs_map[resultado]
-        revisiones.append([f"REV{n:03d}", maquinaria_item[0], fecha, tipo, resultado, tecnico, costo, observaciones])
+        revisiones.append(
+            [
+                f"REV{n:03d}",
+                maquinaria_item[0],
+                fecha,
+                tipo,
+                resultado,
+                tecnico,
+                costo,
+                observaciones,
+            ]
+        )
 
     # Create workbook
     wb = Workbook()
-    
+
     # 1. Empleados
     ws_emp = wb.active
     ws_emp.title = "Empleados"
-    ws_emp.append(["ID", "Nombre Completo", "DNI/NIE", "Telefono", "Email", "Categoria", "Tipo Contrato", "Jornada", "Fecha Alta", "Fecha Baja", "Centro Coste", "Zona Asignada", "Turno Habitual", "Horas Semanales", "Salario Base", "Plus Turnicidad", "Plus Nocturnidad", "Plus Penosidad", "Estado", "Observaciones", "Foto URL"])
+    ws_emp.append(
+        [
+            "ID",
+            "Nombre Completo",
+            "DNI/NIE",
+            "Telefono",
+            "Email",
+            "Categoria",
+            "Tipo Contrato",
+            "Jornada",
+            "Fecha Alta",
+            "Fecha Baja",
+            "Centro Coste",
+            "Zona Asignada",
+            "Turno Habitual",
+            "Horas Semanales",
+            "Salario Base",
+            "Plus Turnicidad",
+            "Plus Nocturnidad",
+            "Plus Penosidad",
+            "Estado",
+            "Observaciones",
+            "Foto URL",
+        ]
+    )
     for emp in empleados:
         ws_emp.append(emp)
 
     # 2. Centros
     ws_cent = wb.create_sheet("Centros")
-    ws_cent.append(["ID Centro", "Nombre", "Cliente", "Direccion", "Zona", "Telefono", "Responsable", "Inicio Servicio", "Superficie m2", "Plantilla Asignada", "Estado"])
+    ws_cent.append(
+        [
+            "ID Centro",
+            "Nombre",
+            "Cliente",
+            "Direccion",
+            "Zona",
+            "Telefono",
+            "Responsable",
+            "Inicio Servicio",
+            "Superficie m2",
+            "Plantilla Asignada",
+            "Estado",
+        ]
+    )
     for c in centros:
         ws_cent.append(c)
 
     # 3. Asignaciones
     ws_asi = wb.create_sheet("Asignaciones")
-    ws_asi.append(["ID Empleado", "ID Centro", "Nombre Centro", "Fecha Asignacion", "Estado", "Horas Semanales"])
+    ws_asi.append(
+        [
+            "ID Empleado",
+            "ID Centro",
+            "Nombre Centro",
+            "Fecha Asignacion",
+            "Estado",
+            "Horas Semanales",
+        ]
+    )
     for a in asignaciones:
         ws_asi.append(a)
 
     # 4. Contratos
     ws_contr = wb.create_sheet("Contratos")
-    ws_contr.append(["ID Empleado", "Tipo Contrato", "Empresa", "Fecha Inicio", "Fecha Fin", "Estado"])
+    ws_contr.append(
+        ["ID Empleado", "Tipo Contrato", "Empresa", "Fecha Inicio", "Fecha Fin", "Estado"]
+    )
     for c in contratos:
         ws_contr.append(c)
 
@@ -238,25 +442,69 @@ def _generate_metalurgica_demo() -> bytes:
 
     # 6. Proveedores
     ws_prov = wb.create_sheet("Proveedores")
-    ws_prov.append(["ID", "Nombre", "CIF", "Servicio", "Contacto", "Telefono", "Email", "Direccion", "Activo", "Ultimo Pedido", "Puntuacion"])
+    ws_prov.append(
+        [
+            "ID",
+            "Nombre",
+            "CIF",
+            "Servicio",
+            "Contacto",
+            "Telefono",
+            "Email",
+            "Direccion",
+            "Activo",
+            "Ultimo Pedido",
+            "Puntuacion",
+        ]
+    )
     for p in proveedores:
         ws_prov.append(p)
 
     # 7. Auditorias
     ws_aud = wb.create_sheet("Auditorias")
-    ws_aud.append(["ID", "Maquinaria", "Fecha", "Tipo", "Resultado", "Tecnico", "Coste", "Hallazgo", "Accion", "Estado"])
+    ws_aud.append(
+        [
+            "ID",
+            "Maquinaria",
+            "Fecha",
+            "Tipo",
+            "Resultado",
+            "Tecnico",
+            "Coste",
+            "Hallazgo",
+            "Accion",
+            "Estado",
+        ]
+    )
     for a in auditorias:
         ws_aud.append(a)
 
     # 8. Maquinaria
     ws_maq = wb.create_sheet("Maquinaria")
-    ws_maq.append(["ID", "Tipo", "Marca", "Modelo", "Serie", "Centro", "Fecha Compra", "Garantia Hasta", "Coste", "Estado", "Proxima Revision", "Proveedor Mantenimiento"])
+    ws_maq.append(
+        [
+            "ID",
+            "Tipo",
+            "Marca",
+            "Modelo",
+            "Serie",
+            "Centro",
+            "Fecha Compra",
+            "Garantia Hasta",
+            "Coste",
+            "Estado",
+            "Proxima Revision",
+            "Proveedor Mantenimiento",
+        ]
+    )
     for m in maquinaria:
         ws_maq.append(m)
 
     # 9. Revisiones
     ws_rev = wb.create_sheet("Revisiones")
-    ws_rev.append(["ID", "Maquinaria", "Fecha", "Tipo", "Resultado", "Tecnico", "Coste", "Observaciones"])
+    ws_rev.append(
+        ["ID", "Maquinaria", "Fecha", "Tipo", "Resultado", "Tecnico", "Coste", "Observaciones"]
+    )
     for r in revisiones:
         ws_rev.append(r)
 
@@ -292,7 +540,7 @@ def ensure_demo() -> dict | None:
         source_bytes = _generate_metalurgica_demo()
     else:
         source_bytes = source.read_bytes()
-    
+
     storage = WorkbookStorage(settings.upload_dir)
     manifest = storage.get(DEMO_ID)
     if manifest is not None:
@@ -300,6 +548,7 @@ def ensure_demo() -> dict | None:
     storage.save_book_as(DEMO_ID, source_bytes)
     try:
         from app.domain import excel_parser
+
         sheets: list[dict] = excel_parser.extract_metadata(storage.book_path(DEMO_ID))
     except Exception:
         storage.delete(DEMO_ID)

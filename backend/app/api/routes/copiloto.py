@@ -26,8 +26,10 @@ async def copiloto(payload: CopilotoPayload, request: Request) -> Any:
 
     # Detras del proxy de Render request.client.host es la IP del propio
     # proxy: sin X-Forwarded-For todos los usuarios compartiran un solo cubo.
+    # La IP real la añade el proxy al FINAL de la cadena: la primera
+    # posición la controla el cliente y se ignora para no permitir spoofing.
     xff = request.headers.get("x-forwarded-for", "")
-    ip = xff.split(",")[0].strip() if xff else (
+    ip = xff.split(",")[-1].strip() if xff else (
         request.client.host if request.client else "anonimo"
     )
     try:

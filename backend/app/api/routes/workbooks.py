@@ -5,16 +5,17 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, File, Query, Response, UploadFile
 
-from ..schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
 from app.core.config import settings
 from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
 from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
+
 from ...errors import (
     InvalidWorkbookError,
     WorkbookNotFoundError,
     WorkbookTooLargeError,
 )
+from ..schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
 
 router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 
@@ -62,19 +63,28 @@ async def upload_workbook(
 ) -> dict:
     """Sube un .xlsx y devuelve el libro completo (metadatos + filas).
 
-    Devuelve las filas en la misma respuesta del upload para evitar
-    requests posteriores que en Vercel serverless caen en otra instancia
-    sin acceso al /tmp de la subida (problema de efimeridad).
+    Devuelve las filas en la misma respuesta del upload: una sola petición
+    para el cliente y una sola pasada de validación en el servidor.
     """
     filename = file.filename or ""
     if Path(filename).suffix.lower() not in EXTENSIONES:
         raise InvalidWorkbookError(
             "Formatos admitidos: .xlsx, .xls, .ods o .csv"
         )
-    data = await file.read()
     max_bytes = settings.max_upload_mb * 1024 * 1024
-    if len(data) > max_bytes:
-        raise WorkbookTooLargeError(f"El archivo supera {settings.max_upload_mb} MB")
+    trozos: list[bytes] = []
+    total = 0
+    while True:
+        trozo = await file.read(1024 * 1024)
+        if not trozo:
+            break
+        total += len(trozo)
+        if total > max_bytes:
+            # Corta en el primer MB que desborda: nunca se materializa
+            # el body completo en memoria antes de rechazarlo.
+            raise WorkbookTooLargeError(f"El archivo supera {settings.max_upload_mb} MB")
+        trozos.append(trozo)
+    data = b"".join(trozos)
     ext = Path(filename).suffix.lower()
     if ext in {".xlsx", ".ods"}:
         if data[:4] != ZIP_MAGIC:
@@ -165,7 +175,7 @@ def export_sheet(
     if sheet_name not in sheet_names:
         raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
     storage = _storage()
-    book_path = storage._ensure_book_exists(manifest["id"])
+    storage._ensure_book_exists(manifest["id"])
     content = excel_parser.build_export(payload.header, payload.rows)
     stem = str(manifest.get("filename", "libro")).rsplit(".", 1)[0] or "libro"
     name = re.sub(r'[\\/:*?"<>|]', "_", f"{stem}_{sheet_name}.xlsx")

@@ -4,6 +4,8 @@ TDD: estos tests definen el comportamiento antes de implementar.
 """
 
 import json
+import sys
+import time
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
@@ -12,6 +14,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from app.core.config import settings
+from app.domain.excel_parser import WorkbookParseTimeoutError, _run_with_timeout
 from app.main import app
 
 CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -115,7 +118,9 @@ def test_carga_rechaza_hojas_vacias_del_todo(client):
     data = make_xlsx({"Vacia": []})
     resp = upload(client, data)
     assert resp.status_code == 201
-    assert resp.json()["sheets"] == [{"name": "Vacia", "rows": 0, "cols": 0, "header": [], "data": []}]
+    assert resp.json()["sheets"] == [
+        {"name": "Vacia", "rows": 0, "cols": 0, "header": [], "data": []}
+    ]
 
 
 # ------------------------------------------------------------- inventario
@@ -282,14 +287,17 @@ def test_tipos_fecha_iso(client):
     assert resp.json()["rows"][0][1] == "2026-10-05T09:30:00"
 
 
-def test_timeout_parser_devuelve_422(client, xlsx_2_hojas, monkeypatch):
-    # Con la implementación sin multiprocessing, el timeout usa signal
-    # que no funciona en el hilo principal de tests -> el test se adapta
-    monkeypatch.setattr(settings, "parse_timeout_s", 1e-7)
-    resp = upload(client, xlsx_2_hojas)
-    # En entorno de test sin signal funcional, el timeout no dispara
-    # En producción (Vercel) sí funciona. Verificamos que no falle.
-    assert resp.status_code in (201, 422)
+def test_run_with_timeout_dispara_timeout_en_unix():
+    if sys.platform == "win32":
+        pytest.skip("SIGALRM no existe en Windows")
+    with pytest.raises(WorkbookParseTimeoutError):
+        _run_with_timeout(time.sleep, 0.5, timeout_s=0.05)
+
+
+def test_run_with_timeout_en_windows_ejecuta_sin_timeout():
+    if sys.platform != "win32":
+        pytest.skip("Comportamiento específico de Windows")
+    assert _run_with_timeout(lambda x: x * 2, 21, timeout_s=0.05) == 42
 
 
 # ------------------------------------------------- demo publico (Fase 3)

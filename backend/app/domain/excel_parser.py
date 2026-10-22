@@ -7,16 +7,17 @@ La exportación siempre genera .xlsx.
 import csv as csv_mod
 import re
 import signal
+import sys
 from datetime import date, datetime
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
 
+import xlrd
 from odf import table as odf_table
 from odf import teletype
 from odf.opendocument import load as ods_load
 from openpyxl import Workbook, load_workbook
-import xlrd
 
 from app.core.config import settings
 from app.errors import (
@@ -269,8 +270,10 @@ def _read_rows_sync(path: str, sheet: str, offset: int, limit: int) -> dict:
 
 
 def _run_with_timeout(func, *args, timeout_s: float):
-    """Ejecuta una función con timeout usando signal (solo Unix, funciona en Vercel)."""
-    # En Windows/serverless sin signal, ejecutar sin timeout
+    """Ejecuta una función con timeout usando signal (solo Unix)."""
+    if sys.platform == "win32":
+        # Windows no tiene SIGALRM: se ejecuta sin timeout
+        return func(*args)
     try:
         old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
         signal.setitimer(signal.ITIMER_REAL, timeout_s)
@@ -283,8 +286,8 @@ def _run_with_timeout(func, *args, timeout_s: float):
     except (AttributeError, ValueError, OSError):
         # signal no disponible (Windows, o entorno restringido) -> sin timeout
         return func(*args)
-    except TimeoutError:
-        raise WorkbookParseTimeoutError(f"El parser supero {timeout_s} segundos")
+    except TimeoutError as exc:
+        raise WorkbookParseTimeoutError(f"El parser supero {timeout_s} segundos") from exc
 
 
 def _check_limits(sheets: list[dict]) -> None:
