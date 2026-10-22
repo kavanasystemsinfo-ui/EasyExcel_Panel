@@ -201,7 +201,8 @@ github-actions.
 backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/api/       rutas y esquemas (workbooks, copiloto, health)
   app/ai/        cadena de proveedores del copiloto, rate limit y caché
-  app/core/      configuración, storage (FS + manifest) y generador del demo
+  app/core/      configuración, storage (FS + manifest), rate limit por IP y
+                 generador del demo
   app/domain/    excel_parser (multi-formato, subproceso con timeout)
   tests/         pytest (73 tests)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
@@ -210,7 +211,8 @@ frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/copilotRender.ts  markdown del copiloto con escape de HTML (anti-XSS)
 boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
 docs/adr/  Decisiones de arquitectura (0001 stack · 0002 persistencia FS ·
-           0003 sesión local · 0004 TTL · 0005 formatos · 0006 rate limit)
+           0003 sesión local · 0004 TTL · 0005 formatos · 0006 rate limit ·
+           0007 acceso abierto sin auth)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
 .github/   CI: ruff + mypy + pytest · oxlint + vitest + build
