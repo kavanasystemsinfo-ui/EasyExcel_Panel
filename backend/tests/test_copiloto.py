@@ -49,7 +49,7 @@ def _fake_falla(status_code: int = 429) -> Any:
 def _limpiar(  # noqa: ANN202
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    assistant._ventanas.clear()
+    assistant._limiter.limpiar()
     assistant._cache.clear()
     monkeypatch.setattr(
         assistant.settings, "openrouter_api_key", "sk-or-test", raising=True
@@ -211,13 +211,13 @@ def test_rate_limit_usa_la_ultima_ip_del_x_forwarded_for(
 
 
 def test_rate_limit_purga_ventanas_caducadas() -> None:
-    """El mapa de cubos no crece sin límite: las ventanas caducadas se eliminan."""
-    assistant._ventanas.clear()
+    # Cota de memoria: al superar max_ips se purgan las ventanas caducadas.
+    assistant._limiter.limpiar()
     vieja = time.monotonic() - 999_999
-    for i in range(assistant._MAX_IPS + 1):
-        assistant._ventanas[f"ip-{i}"] = [vieja]
+    for i in range(assistant._limiter.max_ips + 1):
+        assistant._limiter._ventanas[f"ip-{i}"] = [vieja]
     assistant.comprobar_rate("nueva.ip")
-    assert len(assistant._ventanas) == 1
+    assert len(assistant._limiter._ventanas) == 1
 
 
 def test_cache_evita_segunda_llamada_al_proveedor(

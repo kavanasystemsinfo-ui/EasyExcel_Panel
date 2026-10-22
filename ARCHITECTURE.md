@@ -81,6 +81,7 @@ frontend/src/
 | Control | Valor | Dónde |
 |---|---|---|
 | Tamaño de upload | 10 MB, leídos en bloques de 1 MB (413 al primer bloque desbordado) | `api/routes/workbooks.py` |
+| Cuota de subidas | 30/hora por IP real (última IP de `X-Forwarded-For`), 429 antes de leer el body | `core/ratelimit.py` + `workbooks.py` (ADR-0006) |
 | Estructura | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export | `core/config.py` |
 | Parseo | subproceso con timeout (SIGALRM en Unix, sin timeout en Windows) | `domain/excel_parser.py` |
 | Caducidad de subidas | 2 h (`EASYEXCEL_UPLOAD_TTL_HOURS`) | `core/storage.py` (ADR-0004) |

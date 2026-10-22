@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from ..core.config import settings
+from ..core.ratelimit import LimiteExcedido, RateLimiter
 
 SYSTEM_PROMPT = (
     "Eres el copiloto de EasyExcel Panel, un panel de datos Excel para un "
@@ -59,16 +60,12 @@ class SinClavesError(Exception):
     """No hay ninguna API key configurada en el servidor."""
 
 
-class RateLimitError(Exception):
-    """Se supero el numero de consultas permitidas por ventana."""
+# Mismo tipo que el resto de límites por IP (subidas incluidas); el nombre
+# histórico se conserva porque es el que usan la ruta del copiloto y sus tests.
+RateLimitError = LimiteExcedido
 
-
-_ventanas: dict[str, list[float]] = {}
+_limiter = RateLimiter()
 _cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
-
-# Cota de memoria del mapa de rate limit: las IPs no suelen crecer más que
-# esto en una ventana; al superarse se purgan las ventanas ya caducadas.
-_MAX_IPS = 10_000
 
 
 def proveedores_configurados() -> list[Proveedor]:
@@ -99,27 +96,12 @@ def _modelos(cadena: str) -> list[str]:
 
 
 def comprobar_rate(ip: str) -> None:
-    ahora = time.monotonic()
-    ventana = settings.copiloto_rate_window_s
-    if len(_ventanas) > _MAX_IPS:
-        caducadas = [
-            clave
-            for clave, marcas in _ventanas.items()
-            if not marcas or ahora - max(marcas) >= ventana
-        ]
-        for clave in caducadas:
-            del _ventanas[clave]
-    marcas = [t for t in _ventanas.get(ip, []) if ahora - t < ventana]
-    if len(marcas) >= settings.copiloto_rate_limit:
-        _ventanas[ip] = marcas
-        espera = (
-            f"{ventana // 3600} horas" if ventana >= 3600 else f"{ventana // 60} minutos"
-        )
-        raise RateLimitError(
-            f"Demasiadas consultas al copiloto. Vuelve a intentarlo en {espera}."
-        )
-    marcas.append(ahora)
-    _ventanas[ip] = marcas
+    _limiter.comprobar(
+        ip,
+        settings.copiloto_rate_limit,
+        settings.copiloto_rate_window_s,
+        "consultas al copiloto",
+    )
 
 
 def _mensajes(pregunta: str, contexto: dict[str, Any]) -> list[dict[str, str]]:

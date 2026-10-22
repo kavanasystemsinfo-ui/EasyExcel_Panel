@@ -3,10 +3,11 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Query, Response, UploadFile
+from fastapi import APIRouter, File, Query, Request, Response, UploadFile
 
 from app.core.config import settings
 from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
+from app.core.ratelimit import RateLimiter, ip_real
 from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
 
@@ -18,6 +19,10 @@ from ...errors import (
 from ..schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
 
 router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
+
+# Cuota de subidas por IP (ADR-0006): se consume antes de leer el body,
+# asi que un atacante no puede materializar 10 MB para recibir un 429.
+_subidas = RateLimiter()
 
 ZIP_MAGIC = b"PK\x03\x04"
 OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -59,6 +64,7 @@ def _resolve_id(workbook_id: str) -> str:
 
 @router.post("", status_code=201)
 async def upload_workbook(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
 ) -> dict:
     """Sube un .xlsx y devuelve el libro completo (metadatos + filas).
@@ -66,6 +72,12 @@ async def upload_workbook(
     Devuelve las filas en la misma respuesta del upload: una sola petición
     para el cliente y una sola pasada de validación en el servidor.
     """
+    _subidas.comprobar(
+        ip_real(request),
+        settings.upload_rate_limit,
+        settings.upload_rate_window_s,
+        "subidas de Excel",
+    )
     filename = file.filename or ""
     if Path(filename).suffix.lower() not in EXTENSIONES:
         raise InvalidWorkbookError(

@@ -21,7 +21,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 |---|---|
 | Demo en vivo en producción (Render + dominio propio) | **DESPLEGADO** (<https://easyexcel.kavanasystems.com>) |
 | Dataset demo del servidor (9 hojas de negocio + Info, semilla fija) | **VERIFICADO** |
-| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (70 tests pytest + smoke con el dataset real) |
+| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (73 tests pytest + smoke con el dataset real) |
 | Parsing multi-formato (.xlsx/.xls/.ods/.csv) aislado en subproceso con timeout y límites | **VERIFICADO** (ADR-0005) |
 | Subidas efímeras con caducidad de 2 h | **VERIFICADO** (ADR-0004, tests de purga) |
 | UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (suite frontend: 197 tests Vitest) |
@@ -102,7 +102,7 @@ Cualquiera con el enlace puede verlo y descargarlo como `.xlsx`; nadie puede edi
 
 | Control | Valor |
 |---|---|
-| Upload | 10 MB leídos en bloques de 1 MB (413 al primer bloque que desborda), validación extensión + magic bytes |
+| Upload | 10 MB leídos en bloques de 1 MB (413 al primer bloque que desborda), validación extensión + magic bytes, **30 subidas/hora por IP** (429 antes de leer el body) |
 | Estructura del libro | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export |
 | Parseo | subproceso con timeout, nunca en el hilo de la petición |
 | Caducidad | los Excel subidos caducan a las 2 h y se purgan en cada operación (el demo no caduca) |
@@ -177,7 +177,7 @@ Salida esperada de la verificación: `READ-BACK OK: xlsx reabierto, 0 errores de
 cd backend
 pip install -e ".[dev]"
 uvicorn app.main:app --reload        # API en http://localhost:8000
-ruff check . && mypy app && pytest   # verificaciones (70 tests)
+ruff check . && mypy app && pytest   # verificaciones (73 tests)
 
 # Frontend (Node 24+) — con el backend levantado (proxy /api -> :8000 en dev)
 cd frontend
@@ -202,7 +202,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/ai/        cadena de proveedores del copiloto, rate limit y caché
   app/core/      configuración, storage (FS + manifest) y generador del demo
   app/domain/    excel_parser (multi-formato, subproceso con timeout)
-  tests/         pytest (70 tests)
+  tests/         pytest (73 tests)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/edit.ts         motor de edición de hojas (puro, con límites)
   src/session.ts      sesión local por visitante (sessionStorage, se borra al cerrar)

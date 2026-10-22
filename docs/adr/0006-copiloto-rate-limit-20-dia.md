@@ -48,3 +48,13 @@ repo). Si el servicio se expusiera sin proxy delante, habría que volver a
 - **−** Detrás de un proxy, una IP corporativa NAT comparte cuota.
 - **−** Con auth (Fase 8) convendrá migrar la cuota a usuario y dejar la IP
   como red de seguridad.
+
+## Ampliación: subidas de Excel (22/10/2026)
+
+El mismo mecanismo (`core/ratelimit.py`, IP real de la última posición de
+`X-Forwarded-For`, ventana deslizante con purga de memoria) se aplicó a
+`POST /api/v1/workbooks`: **30 subidas por hora por IP**
+(`EASYEXCEL_UPLOAD_RATE_LIMIT` / `_RATE_WINDOW_S`). La comprobación ocurre
+**antes de leer el body**, así que un atacante no puede materializar 10 MB
+para recibir el 429, y las lecturas (listado, detalle, demo, export) no
+consumen cuota. Cubierto por 3 tests en `test_workbooks.py`.

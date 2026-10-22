@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # borran solos; solo el demo persiste. Horas de vida de una subida.
     upload_ttl_hours: float = 2.0
 
+    # Rate limit de subidas (ADR-0006): por IP real, ventana de una hora.
+    upload_rate_limit: int = 30
+    upload_rate_window_s: float = 3600.0
+
     # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0006)
     openrouter_api_key: str = ""
     openrouter_models: str = "google/gemma-4-31b-it:free,cohere/north-mini-code:free"

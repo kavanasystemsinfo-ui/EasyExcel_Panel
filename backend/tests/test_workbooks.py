@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
+from app.api.routes import workbooks
 from app.core.config import settings
 from app.domain.excel_parser import WorkbookParseTimeoutError, _run_with_timeout
 from app.main import app
@@ -32,10 +33,16 @@ def make_xlsx(sheets: dict[str, list[list[object]]]) -> bytes:
     return buf.getvalue()
 
 
-def upload(client: TestClient, data: bytes, filename: str = "demo.xlsx"):
+def upload(
+    client: TestClient,
+    data: bytes,
+    filename: str = "demo.xlsx",
+    headers: dict[str, str] | None = None,
+):
     return client.post(
         "/api/v1/workbooks",
         files={"file": (filename, data, CONTENT_TYPE)},
+        headers=headers or {},
     )
 
 
@@ -332,4 +339,40 @@ def test_demo_no_se_puede_borrar(client):
 
     assert client.delete("/api/v1/workbooks/demo").status_code == 400
     assert client.delete(f"/api/v1/workbooks/{DEMO_ID}").status_code == 400
+    assert client.get("/api/v1/workbooks/demo").status_code == 200
+
+
+# --------------------------------------------------- rate limit de subidas
+
+
+def test_upload_rate_limit_por_ip(client, xlsx_2_hojas, monkeypatch):
+    workbooks._subidas.limpiar()
+    monkeypatch.setattr(settings, "upload_rate_limit", 2)
+    assert upload(client, xlsx_2_hojas).status_code == 201
+    assert upload(client, xlsx_2_hojas).status_code == 201
+    resp = upload(client, xlsx_2_hojas)
+    assert resp.status_code == 429
+    assert "subidas" in resp.json()["detail"]
+
+
+def test_upload_rate_limit_usa_la_ultima_ip_del_x_forwarded_for(
+    client, xlsx_2_hojas, monkeypatch
+):
+    workbooks._subidas.limpiar()
+    monkeypatch.setattr(settings, "upload_rate_limit", 1)
+    spoof_1 = {"X-Forwarded-For": "1.1.1.1, 9.9.9.9"}
+    spoof_2 = {"X-Forwarded-For": "1.1.1.1, 7.7.7.7"}
+    assert upload(client, xlsx_2_hojas, headers=spoof_1).status_code == 201
+    assert upload(client, xlsx_2_hojas, headers=spoof_1).status_code == 429
+    # misma primera IP que spoof_1: si se usara la primera en vez de la
+    # última (la que añade el proxy), esto saldría 429 en vez de 201.
+    assert upload(client, xlsx_2_hojas, headers=spoof_2).status_code == 201
+
+
+def test_upload_rate_limit_no_toca_las_lecturas(client, xlsx_2_hojas, monkeypatch):
+    workbooks._subidas.limpiar()
+    monkeypatch.setattr(settings, "upload_rate_limit", 1)
+    assert upload(client, xlsx_2_hojas).status_code == 201
+    assert upload(client, xlsx_2_hojas).status_code == 429
+    assert client.get("/api/v1/workbooks").status_code == 200
     assert client.get("/api/v1/workbooks/demo").status_code == 200
