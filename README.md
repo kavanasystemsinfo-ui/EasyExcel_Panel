@@ -9,10 +9,13 @@
 > Abre con un dataset de muestra generado en el servidor, sube tu propio
 > `.xlsx`, filtra, edita, exporta a Excel/PDF y pregúntale al copiloto IA.
 
-Caso de uso real que originó el proyecto: un encargado de personal de limpieza gestiona
-varios centros (trabajadores, turnos, contratos, vacaciones, proveedores, auditorías y
-maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel busca
-reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
+Caso de uso: gestión de personal y operaciones multi-centro con el Excel como
+base de datos (trabajadores, turnos, contratos, vacaciones, proveedores,
+auditorías y maquinaria repartidos entre varios ficheros dispersos). El
+proyecto nació observando un caso real de este tipo en el sector servicios;
+hoy el demo en vivo presenta una planta cerámica sintética, en línea con el
+foco industrial de Kavana Systems (ADR-0008). EasyExcel Panel busca reunirlo
+todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
 ## Estado actual (22/10/2026) — Fase 7 desplegada
@@ -20,8 +23,8 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Componente | Estado |
 |---|---|
 | Demo en vivo en producción (Render + dominio propio) | **DESPLEGADO** (<https://easyexcel.kavanasystems.com>) |
-| Dataset demo del servidor (9 hojas de negocio + Info, semilla fija) | **VERIFICADO** |
-| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (73 tests pytest + smoke con el dataset real) |
+| Dataset demo del servidor (9 hojas de negocio + Info, semilla fija, planta cerámica) | **VERIFICADO** (tests de sector, ADR-0008) |
+| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (76 tests pytest + smoke con el dataset real) |
 | Parsing multi-formato (.xlsx/.xls/.ods/.csv) aislado en subproceso con timeout y límites | **VERIFICADO** (ADR-0005) |
 | Subidas efímeras con caducidad de 2 h | **VERIFICADO** (ADR-0004, tests de purga) |
 | UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (suite frontend: 197 tests Vitest) |
@@ -57,7 +60,8 @@ ADR de [`docs/adr/`](docs/adr/): [0001 stack](docs/adr/0001-stack-y-arquitectura
 [0004 subidas con TTL](docs/adr/0004-subidas-efimeras-ttl.md) ·
 [0005 formatos de entrada](docs/adr/0005-formatos-entrada-xls-ods-csv.md) ·
 [0006 rate limit del copiloto](docs/adr/0006-copiloto-rate-limit-20-dia.md) ·
-[0007 acceso abierto sin auth](docs/adr/0007-acceso-abierto-sin-autenticacion.md).
+[0007 acceso abierto sin auth](docs/adr/0007-acceso-abierto-sin-autenticacion.md) ·
+[0008 sector del demo](docs/adr/0008-sector-del-demo-ceramico.md).
 
 ### Asistente IA (modelos gratuitos)
 
@@ -122,13 +126,16 @@ El proyecto convive con dos datasets, ambos reproducibles:
 
 Generada por `backend/app/core/demo.py` con semilla fija (`20261020`): 50
 empleados y 9 hojas de negocio (Empleados, Centros, Asignaciones, Contratos,
-Vacaciones, Proveedores, Auditorías, Maquinaria, Revisiones) + Info. El
-backend la sirve con `GET /api/v1/workbooks/demo` y la UI la carga sola al
-entrar, sin subir nada.
+Vacaciones, Proveedores, Auditorías, Maquinaria, Revisiones) + Info, con
+temática de planta cerámica sintética (`Cerámica Turia S.A.`, decisión en el
+ADR-0008). El backend la sirve con `GET /api/v1/workbooks/demo` y la UI la
+carga sola al entrar, sin subir nada.
 
-### Dataset original de desarrollo (215 empleados, sector limpieza)
+### Dataset original de desarrollo (215 empleados, sector limpieza, histórico)
 
-Generado por `scripts/generar_dataset_demo.py` (semilla fija, reproducible) desde
+Es el dataset con el que se construyó el proyecto y se mantiene como
+referencia histórica; el demo en vivo no lo usa. Generado por
+`scripts/generar_dataset_demo.py` (semilla fija, reproducible) desde
 `data/empleados_demo.csv`.
 
 | Hoja | Registros | Contenido |
@@ -178,7 +185,7 @@ Salida esperada de la verificación: `READ-BACK OK: xlsx reabierto, 0 errores de
 cd backend
 pip install -e ".[dev]"
 uvicorn app.main:app --reload        # API en http://localhost:8000
-ruff check . && mypy app && pytest   # verificaciones (73 tests)
+ ruff check . && mypy app && pytest   # verificaciones (76 tests)
 
 # Frontend (Node 24+) — con el backend levantado (proxy /api -> :8000 en dev)
 cd frontend
@@ -204,7 +211,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/core/      configuración, storage (FS + manifest), rate limit por IP y
                  generador del demo
   app/domain/    excel_parser (multi-formato, subproceso con timeout)
-  tests/         pytest (73 tests)
+   tests/         pytest (76 tests)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/edit.ts         motor de edición de hojas (puro, con límites)
   src/session.ts      sesión local por visitante (sessionStorage, se borra al cerrar)
@@ -212,7 +219,7 @@ frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
 boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
 docs/adr/  Decisiones de arquitectura (0001 stack · 0002 persistencia FS ·
            0003 sesión local · 0004 TTL · 0005 formatos · 0006 rate limit ·
-           0007 acceso abierto sin auth)
+           0007 acceso abierto sin auth · 0008 sector del demo)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
 .github/   CI: ruff + mypy + pytest · oxlint + vitest + build
@@ -287,8 +294,8 @@ Documentación transversal: [ARCHITECTURE.md](ARCHITECTURE.md) (diagrama y lími
 
 Todos los datos de este repositorio son **100 % sintéticos** (nombres, DNIs, teléfonos,
 direcciones y empresas ficticios). No contienen datos reales de ninguna persona ni de
-ninguna compañía. Los dominios usados (`empresa-limpieza.es`, `demo.easyexcel.local`)
-son inventados. La demo no exige registro y no almacena nada del visitante más allá de
+ninguna compañía. Los dominios usados (`ceramicaturia.es`, `empresa-limpieza.es`,
+`demo.easyexcel.local`) son inventados. La demo no exige registro y no almacena nada del visitante más allá de
 su sesión local en el navegador.
 
 ## Licencia

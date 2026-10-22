@@ -23,7 +23,7 @@ construido: cambios verificables, nada sin prueba que lo respalde.
 ```bash
 # backend
 cd backend
-ruff check . && mypy app && pytest -q        # 73 tests
+ruff check . && mypy app && pytest -q        # 76 tests
 
 # frontend
 cd frontend

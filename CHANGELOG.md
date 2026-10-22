@@ -5,7 +5,7 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 ## [Unreleased]
 
 ### Added
-- **Endurecimiento y pulido profesional (Fase C, 22/10/2026)**: `/docs` y `/openapi.json` desactivados en producción (detección automática por la variable `RENDER`, forzable con `EASYEXCEL_DOCS_ENABLED`; activos en local) con 4 tests nuevos; **rate limit de subidas: 30/hora por IP** con comprobación antes de leer el body (`core/ratelimit.py`, limiter compartido con el copiloto tras refactor, 3 tests) — 73 backend; `render.yaml` con `npm ci` (build reproducible) y cabeceras `X-Content-Type-Options`, `Referrer-Policy` y `Permissions-Policy`; Dependabot semanal para pip, npm y github-actions (el ADR-0001 lo exigía y no existía) y su primera tanda de 8 PRs resuelta en un lote (`react-dom` 19.3.1, `jsdom` 30.1.3, `vitest` 5.0.5, `oxlint` 1.88.0, `@types/node` 26.6.5, actions a v7); `vite` actualizado dentro de su rango hasta 0 vulnerabilidades en `npm audit` y `pip-audit` sin CVEs; `CONTRIBUTING.md`; meta description y Open Graph en `index.html`; About del repo con descripción, topics y dominio vivo; origen Vercel muerto fuera de las CORS de Render; ADR-0007 fija la decisión
+- **Endurecimiento y pulido profesional (Fase C, 22/10/2026)**: `/docs` y `/openapi.json` desactivados en producción (detección automática por la variable `RENDER`, forzable con `EASYEXCEL_DOCS_ENABLED`; activos en local) con 4 tests nuevos; **rate limit de subidas: 30/hora por IP** con comprobación antes de leer el body (`core/ratelimit.py`, limiter compartido con el copiloto tras refactor, 3 tests) — 76 backend; `render.yaml` con `npm ci` (build reproducible) y cabeceras `X-Content-Type-Options`, `Referrer-Policy` y `Permissions-Policy`; Dependabot semanal para pip, npm y github-actions (el ADR-0001 lo exigía y no existía) y su primera tanda de 8 PRs resuelta en un lote (`react-dom` 19.3.1, `jsdom` 30.1.3, `vitest` 5.0.5, `oxlint` 1.88.0, `@types/node` 26.6.5, actions a v7); `vite` actualizado dentro de su rango hasta 0 vulnerabilidades en `npm audit` y `pip-audit` sin CVEs; `CONTRIBUTING.md`; meta description y Open Graph en `index.html`; About del repo con descripción, topics y dominio vivo; origen Vercel muerto fuera de las CORS de Render; ADR-0007 fija la decisión
   de mantener la demo abierta sin autenticación apoyada en esas mitigaciones
   (auth pendiente para la Fase 8 con base de datos).
 
@@ -34,10 +34,18 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 - `backend/__init__.py` (rompía mypy con "source file found twice"; `app` ya es paquete).
 
 ### Changed
+- **Demo público reorientado al sector cerámico (ADR-0008, 22/10/2026)**: el
+  generador `demo.py` pasa de metalúrgica a planta cerámica (`Cerámica Turia
+  S.A.`, dominio sintético `ceramicaturia.es`): centros de producción y
+  laboratorio, maquinaria de prensa/horno/esmaltado con marcas inventadas y
+  proveedores de arcilla y esmaltes; se retiran los vestigios de limpieza que
+  quedaban en maquinaria y auditorías. `DEMO_ID` versionado a `v7` para que
+  Render siembre el nuevo libro; la historia de origen del README se reescribe
+  de forma honesta (caso real en sector servicios, marco industrial actual) y
+  el dataset de 215 empleados queda como histórico. 3 tests de sector
+  (RED→GREEN) — 76 backend.
 - **Subida de archivos en Vercel serverless** (commit `20ef469`): el endpoint `POST /api/v1/workbooks` ahora devuelve las filas parseadas (header + data de todas las hojas) en la misma respuesta del upload. Antes, el frontend hacía GETs posteriores por hoja que en serverless caían en otra instancia sin acceso al `/tmp` efímero de la subida y devolvían 404, dejando el grid vacío.
 - Test rojo `test_demo_filas_reales`: ajustado a las 50 filas reales del generador demo (esperaba 215).
-
-### Changed
 - `requirements.txt` del backend: + `xlrd>=2.0` (lectura de `.xls`) y `odfpy>=1.4` (lectura de `.ods`).
 - `uploadWorkbook` en el frontend tipado como `WorkbookFullResponse` (incluye `header` y `data` por hoja).
 - `handleFile` construye `WorkbookFull` directamente de la respuesta del upload, sin llamadas de seguimiento a `/sheets/{name}/rows`.

@@ -54,7 +54,7 @@ const vacaciones: SheetData = {
 const maquinaria: SheetData = {
   header: ['ID', 'Tipo', 'Estado', 'Proxima Revision'],
   rows: [
-    ['MAQ1', 'Fregadora', 'Operativa', '2026-12-01T00:00:00'],
+    ['MAQ1', 'Horno de rodillo', 'Operativa', '2026-12-01T00:00:00'],
     ['MAQ2', 'Aspirador', 'Operativa', '2026-10-01T00:00:00'],
     ['MAQ3', 'Elevador', 'En mantenimiento', '2027-01-01T00:00:00'],
   ],

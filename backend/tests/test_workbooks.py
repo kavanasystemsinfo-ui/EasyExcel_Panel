@@ -342,6 +342,42 @@ def test_demo_no_se_puede_borrar(client):
     assert client.get("/api/v1/workbooks/demo").status_code == 200
 
 
+def test_demo_sector_ceramico_info_y_centros(client):
+    info = client.get("/api/v1/workbooks/demo/sheets/Info/rows").json()
+    assert info["header"][1] == "EasyExcel Demo Cerámica"
+
+    centros = client.get("/api/v1/workbooks/demo/sheets/Centros/rows").json()
+    clientes = {fila[2] for fila in centros["rows"]}
+    assert clientes == {"Cerámica Turia S.A."}
+
+
+def test_demo_maquinaria_industrial_sin_vestigios_de_limpieza(client):
+    maq = client.get("/api/v1/workbooks/demo/sheets/Maquinaria/rows").json()
+    tipos = [fila[1] for fila in maq["rows"]]
+    prohibidos = (
+        "Fregadora",
+        "Aspiradora",
+        "Monobrocha",
+        "Hidrolavadora",
+        "Carro de limpieza",
+        "Pulidora",
+    )
+    assert not any(p in t for t in tipos for p in prohibidos)
+    assert any("Prensa" in t for t in tipos)
+    assert any("Horno" in t for t in tipos)
+
+
+def test_demo_empleados_y_proveedores_del_sector(client):
+    emp = client.get("/api/v1/workbooks/demo/sheets/Empleados/rows").json()
+    emails = {fila[4] for fila in emp["rows"]}
+    assert emails and all(e.endswith("@ceramicaturia.es") for e in emails)
+
+    prov = client.get("/api/v1/workbooks/demo/sheets/Proveedores/rows").json()
+    servicios = {fila[3] for fila in prov["rows"]}
+    permitidos = {"Arcilla y caolín", "Esmaltes y engobes", "Refractarios", "Paletizado", "Energía"}
+    assert servicios <= permitidos
+
+
 # --------------------------------------------------- rate limit de subidas
 
 

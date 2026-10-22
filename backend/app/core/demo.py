@@ -14,24 +14,31 @@ from app.core.storage import WorkbookStorage
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"
-DEMO_ID = hashlib.sha256(b"easyexcel:demo:v6").hexdigest()[:32]
+DEMO_ID = hashlib.sha256(b"easyexcel:demo:v7").hexdigest()[:32]
 
 
-def _generate_metalurgica_demo() -> bytes:
-    """Genera el Excel demo de metalúrgica programáticamente."""
+def _generate_ceramica_demo() -> bytes:
+    """Genera el Excel demo de planta cerámica programáticamente (ADR-0008)."""
     random.seed(20261020)
 
-    CATEGORIAS = ["Encargado", "Tecnico", "Operario", "Mantenimiento"]
+    CATEGORIAS = [
+        "Encargado de turno",
+        "Operario de prensa",
+        "Operario de esmaltado",
+        "Técnico de calidad",
+        "Mantenimiento",
+        "Mozo de almacén",
+    ]
     TIPOS_CONTRATO = ["Indefinido", "Temporal", "Fijo Discontinuo", "Practicas"]
     JORNADAS = ["Completa", "Parcial", "Turno Día", "Turno Noche"]
-    ZONAS = ["Producción", "Mantenimiento", "Almacén", "Oficina", "QC", "Investigación"]
+    ZONAS = ["Prensa", "Esmaltado", "Horno", "Almacén", "Calidad", "Oficina"]
 
     OBS_OPTIONS = [
         "Disponible fines semana",
-        "Experiencia hospital",
-        "Requiere altura",
+        "Experiencia en horno",
+        "Formación de esmaltado",
         "",
-        "Mantenimiento especiales",
+        "Turno rotativo",
     ]
 
     # Empleados (50)
@@ -60,7 +67,7 @@ def _generate_metalurgica_demo() -> bytes:
         letra_dni = "TRWAGMYFPDXBNJZSQVHLCKE"[random.randint(0, 22)]
         dni = f"{numero_dni}{letra_dni}"
         telefono = f"96{random.randint(1000000, 9999999)}"
-        email = f"{nombre.lower().replace(' ', '.')}@metalurgica.com"
+        email = f"{nombre.lower().replace(' ', '.')}@ceramicaturia.es"
         categoria = random.choice(CATEGORIAS)
         tipo_contrato = random.choice(TIPOS_CONTRATO)
         jornada = random.choice(JORNADAS)
@@ -76,7 +83,7 @@ def _generate_metalurgica_demo() -> bytes:
         plus_penosidad = 0
         estado = random.choice(["Activo", "Activo", "Activo", "Baja", "IT"])
         observaciones = random.choice(OBS_OPTIONS)
-        foto_url = f"https://metalurgica.com/fotos/empleados/{emp_id}.jpg"
+        foto_url = f"https://ceramicaturia.es/fotos/empleados/{emp_id}.jpg"
         empleados.append(
             [
                 emp_id,
@@ -106,12 +113,12 @@ def _generate_metalurgica_demo() -> bytes:
     # Centros (6)
     centros = []
     nombres_centros = [
-        "Fábrica Norte",
-        "Fábrica Sur",
-        "Planta Central",
-        "Almacén Principal",
+        "Planta Norte",
+        "Planta Sur",
+        "Esmaltado Central",
+        "Almacén de Terminado",
         "Oficina Central",
-        "QC Industrial",
+        "Laboratorio de Calidad",
     ]
     for i in range(1, 7):
         centro_id = f"CC{i:02d}"
@@ -129,7 +136,7 @@ def _generate_metalurgica_demo() -> bytes:
                     "Carlos Martín",
                 ]
             )
-            + " (Metalúrgica)"
+            + " (Cerámica Turia)"
         )
         inicio_servicio = date(2020, 1, 1) + timedelta(days=random.randint(0, 2000))
         superficie_m2 = random.randint(500, 5000)
@@ -138,8 +145,8 @@ def _generate_metalurgica_demo() -> bytes:
             [
                 centro_id,
                 nombre,
-                "Metalúrgica S.A.",
-                f"Calle Metalúrgica {i}, Parque Industrial",
+                "Cerámica Turia S.A.",
+                f"Calle Cerámica {i}, Polígono Industrial",
                 zona,
                 telefono,
                 responsable,
@@ -184,7 +191,7 @@ def _generate_metalurgica_demo() -> bytes:
             [
                 emp_id,
                 tipo,
-                "Metalúrgica S.A.",
+                "Cerámica Turia S.A.",
                 fecha_ini,
                 fecha_fin,
                 random.choice(["Indefinido", "Definido"]),
@@ -207,7 +214,7 @@ def _generate_metalurgica_demo() -> bytes:
     for i in range(1, 11):
         cif = f"B{random.randint(10000000, 99999999)}"
         servicio = random.choice(
-            ["Materia prima", "Aceites", "Herramientas", "Componentes", "Energía"]
+            ["Arcilla y caolín", "Esmaltes y engobes", "Refractarios", "Paletizado", "Energía"]
         )
         nombre_contacto = random.choice(["Mario", "Juan", "Pedro"])
         apellido_contacto = random.choice(["Garcia", "Lopez", "Fernandez"])
@@ -216,7 +223,7 @@ def _generate_metalurgica_demo() -> bytes:
         proveedores.append(
             [
                 f"PROV{i:02d}",
-                f"Compañía Metalúrgica {i}",
+                f"Suministros Cerámicos {i}",
                 cif,
                 servicio,
                 contacto,
@@ -233,17 +240,17 @@ def _generate_metalurgica_demo() -> bytes:
     # Auditorias (30)
     auditorias = []
     hallazgos = [
-        "Restos en zona de producción",
-        "Producto sin ficha de seguridad actualizada",
+        "Pieza sin etiquetar en paleta de expedición",
+        "Temperatura de horno fuera de curva",
         "Falta de EPIs en el almacén",
         "Programa de mantenimiento sin firma",
         "Contenedor de residuos sin etiquetar",
-        "Zona común con incidencia recurrente",
+        "Lote sin documentación de conformidad",
         "Maquinaria sin etiqueta de revisión",
-        "Depósito de agua estancado",
+        "Polvo de esmalte en zona de traslado",
     ]
     acciones = [
-        "Limpieza profunda programada y ficha SDS actualizada",
+        "Curva térmica revisada y etiquetado repuesto",
         "Reposición de EPIs y formación al equipo del turno",
         "Firma y archivo del programa de mantenimiento",
         "Contenedor etiquetado y formación de segregación",
@@ -277,16 +284,16 @@ def _generate_metalurgica_demo() -> bytes:
     # Maquinaria (30)
     maquinaria = []
     tipos = [
-        ("Fregadora discos", "Nilfisk", "Sc6000", 2400),
-        ("Fregadora autónoma", "Karcher", "B 90 R", 6800),
-        ("Aspiradora mochila", "Numatic", "Henry XWD", 380),
-        ("Aspiradora industrial", "Nilfisk", "VA2000", 1250),
-        ("Monobrocha", "Viper", "Fang 150", 560),
-        ("Hidrolavadora", "Karcher", "HD 6/15", 990),
-        ("Secador de suelos", "Numatic", "TMR 390", 1450),
-        ("Elevador tijera", "JLG", "1930ES", 7500),
-        ("Carro de limpieza", "Vikan", "Compact 250", 320),
-        ("Pulidora orbital", "3M", "FriXion 5200", 1100),
+        ("Prensa de embutición", "Premsa", "EP-2400", 86000),
+        ("Prensa de alta tabla", "TecnoPrensa", "AT-1600", 74000),
+        ("Horno de rodillo", "HornoTech", "HR-160", 132000),
+        ("Horno de bizcocho", "HornoTech", "HB-90", 98000),
+        ("Línea de esmaltado", "Esmaltek", "LE-4", 56000),
+        ("Secadora de bandejas", "CeramSec", "SB-12", 21000),
+        ("Envolvedora automática", "Paletia", "EA-360", 17500),
+        ("Carretilla elevadora", "Elevcar", "EC-25", 24000),
+        ("Compresor de tornillo", "AireTech", "CT-45", 12800),
+        ("Molino de bola", "CeramGrind", "MG-8", 31000),
     ]
     centros_ids = ["CC01", "CC02", "CC03", "CC04", "CC05"]
     for i in range(30):
@@ -510,7 +517,7 @@ def _generate_metalurgica_demo() -> bytes:
 
     # 10. Info
     ws_info = wb.create_sheet("Info")
-    ws_info.append(["Proyecto", "EasyExcel Demo Metalúrgica"])
+    ws_info.append(["Proyecto", "EasyExcel Demo Cerámica"])
     ws_info.append(["Fecha Generacion", date.today().isoformat()])
     ws_info.append(["Total Empleados", len(empleados)])
     ws_info.append(["Total Centros", len(centros)])
@@ -537,7 +544,7 @@ def ensure_demo() -> dict | None:
     source = _source()
     # Si no existe el archivo, generarlo en memoria
     if not source.is_file():
-        source_bytes = _generate_metalurgica_demo()
+        source_bytes = _generate_ceramica_demo()
     else:
         source_bytes = source.read_bytes()
 

@@ -13,7 +13,7 @@ const hojas = [
   {
     name: 'Centros',
     header: ['ID', 'Nombre'],
-    rows: [['CC01', 'Sara Limpieza']],
+    rows: [['CC01', 'Sara Molina']],
   },
 ]
 
