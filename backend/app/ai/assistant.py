@@ -1,9 +1,12 @@
 """Asistente del copiloto: cadena de modelos gratuitos conmutable.
 
-Orden medido el 2026-10-06 (benchmark real con latencias):
-    OpenRouter inclusionai/ling-3.1-flash  ttfb 1.5s
-    OpenRouter cohere/north-mini-code:free ttfb 1.4s
-    NVIDIA    google/gemma-4-31b-it        ~45s (respaldo por cuota agotada)
+Orden por defecto (config.py; configurable con EASYEXCEL_OPENROUTER_MODELS y
+EASYEXCEL_NVIDIA_MODELS):
+    OpenRouter google/gemma-4-31b-it:free -> cohere/north-mini-code:free
+    NVIDIA     google/gemma-4-31b-it (respaldo por cuota agotada)
+
+Benchmark medido el 2026-10-06: north-mini-code:free ttfb 1.4s,
+inclusionai/ling-3.1-flash ttfb 1.5s, NVIDIA ~45s.
 """
 
 import asyncio

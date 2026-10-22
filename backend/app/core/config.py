@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # borran solos; solo el demo persiste. Horas de vida de una subida.
     upload_ttl_hours: float = 2.0
 
-    # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0002)
+    # Copiloto IA: proveedores conmutables de modelos gratuitos (ADR-0006)
     openrouter_api_key: str = ""
     openrouter_models: str = "google/gemma-4-31b-it:free,cohere/north-mini-code:free"
     nvidia_api_key: str = ""

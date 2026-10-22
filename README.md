@@ -1,8 +1,13 @@
 # EasyExcel Panel
 
 [![CI](https://github.com/kavanasystemsinfo-ui/EasyExcel_Panel/actions/workflows/ci.yml/badge.svg)](https://github.com/kavanasystemsinfo-ui/EasyExcel_Panel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/licencia-MIT-green.svg)](LICENSE)
 
 **Dashboard de gestión sobre Excel para entornos donde el Excel es la base de datos.**
+
+> **Demo en vivo**: <https://easyexcel.kavanasystems.com>
+> Abre con un dataset de muestra generado en el servidor, sube tu propio
+> `.xlsx`, filtra, edita, exporta a Excel/PDF y pregúntale al copiloto IA.
 
 Caso de uso real que originó el proyecto: un encargado de personal de limpieza gestiona
 varios centros (trabajadores, turnos, contratos, vacaciones, proveedores, auditorías y
@@ -10,16 +15,16 @@ maquinaria) repartidos entre varios archivos Excel dispersos. EasyExcel Panel bu
 reunirlo todo en un dashboard moderno con edición, filtros, gráficos y asistencia IA,
 sincronizado con los .xlsx que la empresa ya usa.
 
-## Estado actual: Fase 6 (Asistente IA con modelos gratuitos)
+## Estado actual (22/10/2026) — Fase 7 desplegada
 
 | Componente | Estado |
 |---|---|
-| Dataset demo (9 hojas de negocio + Info) | **VERIFICADO** |
-| Validador de coherencia del dataset | **VERIFICADO** (read-back independiente) |
-| Excel en la nube de solo lectura | **DESPLEGADO** |
-| API de workbooks: carga, listado, detalle, filas, borrado, demo, export y copiloto (8 endpoints) | **VERIFICADO** (39 tests + smoke con el dataset real) |
-| Parsing de Excel aislado en subproceso con timeout y límites | **VERIFICADO** (test de timeout) |
-| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (158 tests Vitest) |
+| Demo en vivo en producción (Render + dominio propio) | **DESPLEGADO** (<https://easyexcel.kavanasystems.com>) |
+| Dataset demo del servidor (9 hojas de negocio + Info, semilla fija) | **VERIFICADO** |
+| API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (66 tests pytest + smoke con el dataset real) |
+| Parsing multi-formato (.xlsx/.xls/.ods/.csv) aislado en subproceso con timeout y límites | **VERIFICADO** (ADR-0005) |
+| Subidas efímeras con caducidad de 2 h | **VERIFICADO** (ADR-0004, tests de purga) |
+| UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (suite frontend: 197 tests Vitest) |
 | Navegación por 4 vistas (Resumen, Personal, Operaciones, Datos) con KPIs, gráficos y hojas por dominio | **VERIFICADO** (tests de `views.ts` + E2E de navegación) |
 | Vista Resumen: 6 KPIs del día + alertas del día, sin tabla | **VERIFICADO** (E2E con capturas) |
 | Scroll del dashboard con rueda y barra siempre visible (fix de app shell) | **VERIFICADO** (E2E: `scrollTop` 0 → 460 con la rueda) |
@@ -37,30 +42,32 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Gráficos por dominio (barras y donut con selector de serie, recharts) | **VERIFICADO** (8 tests de series + E2E con SVG renderizado) |
 | Vista persistente (sección, hoja, filtros, búsqueda, página) en la sesión | **VERIFICADO** (tests de sesión + E2E tras recarga) |
 | Tooling: ruff, mypy, pytest, oxlint, vitest | **VERIFICADO** (ejecución local) |
-| CI en GitHub Actions (backend + frontend) | **VERIFICADO** (ambos jobs en verde) |
-| Asistente IA: preguntas en lenguaje natural con contexto anclado (KPIs, alertas, conteos por columna y muestra filtrada), streaming SSE, cadena de respaldo de modelos gratuitos (OpenRouter → gemma-4-31b-it:free / north-mini-code:free), rate limit por IP y caché de preguntas repetidas | **VERIFICADO** (10 tests backend + 9 frontend + E2E real: "¿Cuántos de vacaciones hoy?" → "15 empleados" = `kpis.vacaciones.hoy`, vía `openrouter · gemma-4-31b-it:free / north-mini-code:free`) |
+| CI en GitHub Actions (backend + frontend) | **VERIFICADO** (badge en verde en cada push a `main`) |
+| Asistente IA: preguntas en lenguaje natural con contexto anclado (KPIs, alertas, conteos por columna y muestra filtrada), streaming SSE, cadena de respaldo de modelos gratuitos (OpenRouter → NVIDIA), rate limit de 20 consultas/día por IP y caché de preguntas repetidas | **VERIFICADO** (tests backend de `test_copiloto.py` + 13 tests del panel + E2E real: "¿Cuántos de vacaciones hoy?" → "15 empleados" = `kpis.vacaciones.hoy`) |
 | Panel Asistente IA arriba del todo (tras el banner), con cabecera colapsable (desplegar/ocultar, persistida en `localStorage`) y fondo degradado azul → azul oscuro; sin botón propio en el topbar | **VERIFICADO** (tests de UI + E2E: título, `aria-expanded`, degradado, persistencia) |
+| Respuesta del copiloto con markdown escapado (anti-XSS) | **VERIFICADO** (3 tests de DOM: el HTML del modelo no se inyecta) |
 | Botón "F" (Buscar) en la toolbar: abre un campo de búsqueda manual de cualquier dato en la hoja activa; con búsqueda activa queda pulsado y al volver a pulsarla limpia | **VERIFICADO** (4 tests de UI + E2E: 7 → 1 filas con "Bogot" → 7 al limpiar) |
-| Menú de filtro de columna reposicionado para abrir hacia arriba o recortarse cuando no cabe en el viewport (el panel de arriba bajaba la tabla y desbordaba el menú) | **VERIFICADO** (4 tests de posicionamiento + E2E de filtro con recorte) |
-| Auth y multiusuario | No implementado aún |
+| Menú de filtro de columna reposicionado para abrir hacia arriba o recortarse cuando no cabe en el viewport | **VERIFICADO** (4 tests de posicionamiento + E2E de filtro con recorte) |
+| Auth y multiusuario | **PENDIENTE** (Fase 8) |
 
-El stack está decidido en [ADR-0001](docs/adr/0001-stack-y-arquitectura.md)
-(React + TypeScript / FastAPI + openpyxl / PostgreSQL / Docker), la persistencia
-de los Excel subidos en [ADR-0002](docs/adr/0002-persistencia-workbooks-fs.md)
-(FS con manifest JSON, límites: 10 MB, 50 hojas, 200 columnas, 100.000 filas) y
-la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
-(sessionStorage por visitante: se restablece al cerrar el navegador, sin JWT hasta que haya multiusuario).
+Las decisiones están documentadas en [ARCHITECTURE.md](ARCHITECTURE.md) y en los
+ADR de [`docs/adr/`](docs/adr/): [0001 stack](docs/adr/0001-stack-y-arquitectura.md) ·
+[0002 persistencia FS](docs/adr/0002-persistencia-workbooks-fs.md) ·
+[0003 sesión local](docs/adr/0003-sesion-local-demo.md) ·
+[0004 subidas con TTL](docs/adr/0004-subidas-efimeras-ttl.md) ·
+[0005 formatos de entrada](docs/adr/0005-formatos-entrada-xls-ods-csv.md) ·
+[0006 rate limit del copiloto](docs/adr/0006-copiloto-rate-limit-20-dia.md).
 
 ### Asistente IA (modelos gratuitos)
 
 `POST /api/v1/copiloto` recibe `{pregunta, contexto}` y responde por **SSE**
-(eventos `delta` → `fin`, o `error`). El proveedor se decide en el servidor:
+(eventos `delta` → `fin`, o `error`). El proveedor se decide en el servidor y
+la cadena es configurable por variables de entorno; por defecto:
 
-| Orden | Proveedor | Modelo | Latencia medida (2026-10-06) |
-|---|---|---|---|
-| 1 | OpenRouter | `inclusionai/ling-3.1-flash` | ttfb 1,5 s (si da 429 salta al siguiente) |
-| 2 | OpenRouter | `cohere/north-mini-code:free` | ttfb 1,4 s |
-| 3 | NVIDIA NIM | `google/gemma-4-31b-it` | ~45 s (respaldo por cuota de OpenRouter) |
+| Orden | Proveedor | Modelos |
+|---|---|---|
+| 1 | OpenRouter | `google/gemma-4-31b-it:free` → `cohere/north-mini-code:free` |
+| 2 | NVIDIA NIM (respaldo por cuota agotada en OpenRouter) | `google/gemma-4-31b-it` |
 
 - **Contexto anclado**: el frontend envía hoja, sección, filtros activos, KPIs,
   alertas, conteos por columna (máx. 8 columnas categóricas con ≤40 valores) y
@@ -75,9 +82,10 @@ la edición local de la Fase 3 en [ADR-0003](docs/adr/0003-sesion-local-demo.md)
   necesito gestionar hoy?", "¿Qué alertas hay abiertas?", "¿Quién está de
   vacaciones hoy?", "¿Qué centro tiene más huecos?" y "Muéstrame revisiones
   vencidas".
-- **Protecciones**: 40 consultas / 10 min por IP, caché de 200 preguntas
-  idénticas, `max_tokens` 1.500 y timeout de 90 s; sin ninguna clave configurada
-  responde `503`; logging de cada intento (`easyexcel.copiloto`).
+- **Protecciones** (ADR-0006): 20 consultas / día por IP real (última IP de
+  `X-Forwarded-For`, la que añade el proxy), caché de 200 preguntas idénticas,
+  `max_tokens` 1.500 y timeout de 90 s; sin ninguna clave configurada responde
+  `503`; logging de cada intento (`easyexcel.copiloto`).
 - **Claves**: `backend/.env` (gitignorado) con `EASYEXCEL_OPENROUTER_API_KEY`
   y `EASYEXCEL_NVIDIA_API_KEY`; ver `backend/.env.example`.
 - **Privacidad**: la UI avisa que se usan modelos gratuitos externos para
@@ -90,7 +98,32 @@ https://drive.google.com/file/d/1pRZnz16rikA7Lq3vTwLr3RTElOuvvZQO/view
 
 Cualquiera con el enlace puede verlo y descargarlo como `.xlsx`; nadie puede editarlo.
 
-## Dataset
+## Seguridad y límites
+
+| Control | Valor |
+|---|---|
+| Upload | 10 MB leídos en bloques de 1 MB (413 al primer bloque que desborda), validación extensión + magic bytes |
+| Estructura del libro | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export |
+| Parseo | subproceso con timeout, nunca en el hilo de la petición |
+| Caducidad | los Excel subidos caducan a las 2 h y se purgan en cada operación (el demo no caduca) |
+| Copiloto | 20/día por IP, caché 200, sin claves → 503 |
+| HTML del copiloto | todo el texto del modelo se escapa antes del markdown (`frontend/src/copilotoRender.ts`) |
+| CORS | en producción todo es mismo origen vía proxy `/api`; allowlist explícita en dev |
+| Datos | **100 % sintéticos**; sin autenticación todavía: no subir información real |
+
+## Datasets
+
+El proyecto convive con dos datasets, ambos reproducibles:
+
+### Demo en vivo (la que carga la web)
+
+Generada por `backend/app/core/demo.py` con semilla fija (`20261020`): 50
+empleados y 9 hojas de negocio (Empleados, Centros, Asignaciones, Contratos,
+Vacaciones, Proveedores, Auditorías, Maquinaria, Revisiones) + Info. El
+backend la sirve con `GET /api/v1/workbooks/demo` y la UI la carga sola al
+entrar, sin subir nada.
+
+### Dataset original de desarrollo (215 empleados, sector limpieza)
 
 Generado por `scripts/generar_dataset_demo.py` (semilla fija, reproducible) desde
 `data/empleados_demo.csv`.
@@ -123,7 +156,7 @@ Generado por `scripts/generar_dataset_demo.py` (semilla fija, reproducible) desd
 - Auditorías: acción correctiva obligatoria si el resultado no es Conforme.
 - Proveedores inactivos sin importes en 2026.
 
-## Cómo reproducir
+## Cómo reproducir el dataset de desarrollo
 
 Requisitos: Python 3.11+ y `openpyxl`.
 
@@ -142,33 +175,44 @@ Salida esperada de la verificación: `READ-BACK OK: xlsx reabierto, 0 errores de
 cd backend
 pip install -e ".[dev]"
 uvicorn app.main:app --reload        # API en http://localhost:8000
-ruff check . && mypy app && pytest   # verificaciones
+ruff check . && mypy app && pytest   # verificaciones (66 tests)
 
 # Frontend (Node 24+) — con el backend levantado (proxy /api -> :8000 en dev)
 cd frontend
 npm install
 npm run dev                          # UI en http://localhost:5173
-npm run lint && npm test && npm run build
+npm run lint && npm test && npm run build   # oxlint + 197 tests + build
 ```
 
 La documentación OpenAPI se genera automáticamente en `/docs` y `/openapi.json`.
+
+En CI (GitHub Actions) los mismos mandatos corren en cada push y PR: `ruff` +
+`mypy` + `pytest` para el backend, `oxlint` + `vitest` + `build` para el
+frontend.
 
 ## Estructura
 
 ```
 backend/   FastAPI + Pydantic (app/), tests/ (pytest)
-  app/api/       rutas y esquemas (workbooks, health)
-  app/core/      configuración y storage (FS + manifest)
-  app/domain/    excel_parser (subproceso con timeout)
-frontend/  React + TypeScript con Vite (src/, tests con Vitest)
-  src/edit.ts     motor de edición de hojas (puro, con límites)
-  src/session.ts  sesión local por visitante (sessionStorage, se borra al cerrar)
+  app/api/       rutas y esquemas (workbooks, copiloto, health)
+  app/ai/        cadena de proveedores del copiloto, rate limit y caché
+  app/core/      configuración, storage (FS + manifest) y generador del demo
+  app/domain/    excel_parser (multi-formato, subproceso con timeout)
+  tests/         pytest (66 tests)
+frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
+  src/edit.ts         motor de edición de hojas (puro, con límites)
+  src/session.ts      sesión local por visitante (sessionStorage, se borra al cerrar)
+  src/copilotRender.ts  markdown del copiloto con escape de HTML (anti-XSS)
 boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
-docs/adr/  Decisiones de arquitectura (0001: stack · 0002: persistencia FS · 0003: sesión local)
+docs/adr/  Decisiones de arquitectura (0001 stack · 0002 persistencia FS ·
+           0003 sesión local · 0004 TTL · 0005 formatos · 0006 rate limit)
 data/      empleados_demo.csv (base) · easyexcel_demo.xlsx (generado)
 scripts/   generar_dataset_demo.py · verificar_dataset.py
 .github/   CI: ruff + mypy + pytest · oxlint + vitest + build
 ```
+
+Documentación transversal: [ARCHITECTURE.md](ARCHITECTURE.md) (diagrama y límites),
+[CHANGELOG.md](CHANGELOG.md) (historia) y [LICENSE](LICENSE) (MIT).
 
 ## Roadmap
 
@@ -214,21 +258,28 @@ scripts/   generar_dataset_demo.py · verificar_dataset.py
      muestra el total filtrado sin el texto incorrecto "en la página"
 6. **Fase 6** — Copiloto IA con modelos gratuitos ✅
    - `POST /api/v1/copiloto` con streaming SSE: cadena conmutable de
-     proveedores (OpenRouter `ling-3.1-flash` → `north-mini-code:free` →
-     NVIDIA `gemma-4-31b-it`), con benchmarks reales de latencia del
-     06/10/2026, rate limit por IP, caché de preguntas repetidas y logging
-     de intentos
+     proveedores (OpenRouter → NVIDIA) con configuración por env vars,
+     rate limit por IP, caché de preguntas repetidas y logging de intentos
    - Contexto anclado a los datos del dashboard (KPIs, alertas, conteos por
      columna y muestra filtrada) con system prompt que prohíbe inventar
      números; el panel escribe en streaming, muestra proveedor y modelo, y
      avisa de que son modelos gratuitos para datos demo sin información
      personal real
-7. **Fase 7** — Autenticación y multiusuario (opcional)
-7. **Fase 7** — Docker, despliegue y documentación final
+7. **Fase 7** — Despliegue en producción ✅
+   - Render (backend con disco persistente + frontend estático con proxy
+     `/api`), dominio propio `easyexcel.kavanasystems.com`, CI en verde y
+     auditoría de seguridad y documentación (22/10/2026)
+8. **Fase 8** — Autenticación y multiusuario (pendiente; JWT + RLS cuando
+   haya base de datos, ADR-0001)
 
 ## Nota de privacidad
 
 Todos los datos de este repositorio son **100 % sintéticos** (nombres, DNIs, teléfonos,
 direcciones y empresas ficticios). No contienen datos reales de ninguna persona ni de
 ninguna compañía. Los dominios usados (`empresa-limpieza.es`, `demo.easyexcel.local`)
-son inventados.
+son inventados. La demo no exige registro y no almacena nada del visitante más allá de
+su sesión local en el navegador.
+
+## Licencia
+
+[MIT](LICENSE) — © 2026 Jorge Adán (Kavana Systems).

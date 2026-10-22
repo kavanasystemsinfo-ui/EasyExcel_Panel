@@ -1,6 +1,6 @@
 # ADR-0001: Stack y arquitectura de EasyExcel Panel
 
-- **Estado**: Aceptado
+- **Estado**: Aceptado, con enmiendas (ver abajo)
 - **Fecha**: 05/10/2026
 - **Decisor**: Jorge (con recomendación técnica de Elias)
 
@@ -77,3 +77,23 @@ de las interfaces.
 2. Archivos en object storage tras interfaz (migración sin tocar código de negocio).
 3. Exportaciones PDF y trabajos pesados en cola/worker, fuera del request cycle.
 4. DB con pool de conexiones y migraciones versionadas desde la Fase 1.
+
+## Enmiendas (22/10/2026)
+
+El texto de arriba se conserva como decisión histórica; tres puntos han sido
+superados por la realidad del proyecto:
+
+1. **Base de datos**: PostgreSQL/Neon no se ha llegado a usar. La persistencia
+   real de los workbooks es filesystem + manifest JSON tras la interfaz
+   `Storage` — ver [ADR-0002](0002-persistencia-workbooks-fs.md). El parser
+   multi-formato añadió xlrd/odfpy/csv además de openpyxl: [ADR-0005](0005-formatos-entrada-xls-ods-csv.md).
+2. **Despliegue**: Vercel se retiró (el filesystem efímero de `/tmp` perdía los
+   Excel subidos); todo vive en Render con disco persistente, configurado en
+   `render.yaml`. El despliegue y las env vars de la API de Render están
+   documentados en [ARCHITECTURE.md](../../ARCHITECTURE.md).
+3. **Rate limit del copiloto**: la Fase 6 definió 40/10 min; hoy es 20
+   consultas/día por IP real con poda de memoria — ver
+   [ADR-0006](0006-copiloto-rate-limit-20-dia.md).
+
+La seguridad de uploads, parseo aislado y límites de estructura de este ADR
+siguen vigentes y están automatizados en tests.
