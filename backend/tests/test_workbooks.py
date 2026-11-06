@@ -118,16 +118,27 @@ def test_carga_rechaza_demasiadas_columnas(client, monkeypatch):
     monkeypatch.setattr(settings, "max_columns", 3)
     data = make_xlsx({"Hoja": [[f"c{i}" for i in range(4)], ["1", "2", "3", "4"]]})
     resp = upload(client, data)
-    assert resp.status_code == 422
+    # Nuevo comportamiento: no rechaza, trunca con aviso
+    assert resp.status_code == 201
+    body = resp.json()
+    hoja = body["sheets"][0]
+    assert hoja["truncada"] == "columnas"
+    assert hoja["cols"] <= 3
 
 
 def test_carga_rechaza_hojas_vacias_del_todo(client):
     data = make_xlsx({"Vacia": []})
     resp = upload(client, data)
     assert resp.status_code == 201
-    assert resp.json()["sheets"] == [
-        {"name": "Vacia", "rows": 0, "cols": 0, "header": [], "data": []}
-    ]
+    hoja = resp.json()["sheets"][0]
+    assert hoja["name"] == "Vacia"
+    assert hoja["rows"] == 0
+    assert hoja["cols"] == 0
+    assert hoja["header"] == []
+    assert hoja["data"] == []
+    # nuevos campos
+    assert hoja.get("header_row") == 1
+    assert hoja.get("truncada") is None
 
 
 # ------------------------------------------------------------- inventario

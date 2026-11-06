@@ -200,10 +200,20 @@ def test_extensiones_no_admitidas_rechazadas(client):
 def test_limites_aplican_al_csv(client, monkeypatch):
     monkeypatch.setattr(settings, "max_columns", 2)
     resp = upload(client, CSV_SEMICOLON, "ventas.csv")
-    assert resp.status_code == 422
+    # Nuevo comportamiento: no rechaza, trunca con aviso
+    assert resp.status_code == 201
+    body = resp.json()
+    hoja = body["sheets"][0]
+    assert hoja["truncada"] == "columnas"
+    assert hoja["cols"] <= 2
 
 
 def test_csv_supera_max_filas(client, monkeypatch):
     monkeypatch.setattr(settings, "max_rows_per_sheet", 1)
     resp = upload(client, CSV_SEMICOLON, "ventas.csv")
-    assert resp.status_code == 422
+    # Nuevo comportamiento: no rechaza, trunca con aviso
+    assert resp.status_code == 201
+    body = resp.json()
+    hoja = body["sheets"][0]
+    assert hoja["truncada"] == "filas"
+    assert hoja["rows"] <= 1

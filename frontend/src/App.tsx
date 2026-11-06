@@ -70,7 +70,13 @@ async function cargarHojas(manifest: Workbook): Promise<WorkbookFull> {
         offset += page.rows.length
         if (page.rows.length === 0 || offset >= page.total) break
       }
-      return { name: sheet.name, header, rows }
+      return {
+        name: sheet.name,
+        header,
+        rows,
+        header_row: sheet.header_row ?? 1,
+        truncada: sheet.truncada ?? null,
+      }
     }),
   )
   return {
@@ -231,7 +237,13 @@ function App() {
         id: full.id,
         filename: full.filename,
         uploaded_at: full.uploaded_at,
-        hojas: full.sheets.map((s) => ({ name: s.name, header: s.header, rows: s.data })),
+        hojas: full.sheets.map((s) => ({
+          name: s.name,
+          header: s.header,
+          rows: s.data,
+          header_row: s.header_row ?? 1,
+          truncada: s.truncada ?? null,
+        })),
       }
       instalar(wbFull, 'datos')
     } catch (error: unknown) {
@@ -325,7 +337,13 @@ function App() {
   const sheetsSelector = (wb?.hojas ?? [])
     .filter((h) => hojasVisibles.includes(h.name))
     .sort((a, b) => hojasVisibles.indexOf(a.name) - hojasVisibles.indexOf(b.name))
-    .map((h) => ({ name: h.name, rows: h.rows.length, cols: h.header.length }))
+    .map((h) => ({
+      name: h.name,
+      rows: h.rows.length,
+      cols: h.header.length,
+      header_row: h.header_row ?? 1,
+      truncada: h.truncada ?? null,
+    }))
   const kpisSeccion = kpisDeSeccion(seccion)
   const graficosSeccion = graficosDeSeccion(seccion, graficosBase)
   const seccionesLibro = useMemo(() => {

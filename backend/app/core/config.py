@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     max_columns: int = 200
     max_rows_per_sheet: int = 100_000
     max_export_cells: int = 2_000_000
-    parse_timeout_s: float = 5.0
+    parse_timeout_s: float = 120.0
     upload_dir: Path = UPLOAD_BASE
 
     # Subidas efimeras (ADR-0004): los Excel de usuarios caducan y se

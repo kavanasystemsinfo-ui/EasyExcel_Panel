@@ -11,6 +11,7 @@ function SheetSelector({ sheets, active, onSelect }: Props) {
     <div className="sheet-tabs" role="tablist" aria-label="Hojas del libro">
       {sheets.map((sheet) => {
         const isActive = sheet.name === active
+        const truncada = sheet.truncada
         return (
           <button
             key={sheet.name}
@@ -19,10 +20,19 @@ function SheetSelector({ sheets, active, onSelect }: Props) {
             aria-selected={isActive}
             className={`sheet-tab${isActive ? ' is-active' : ''}`}
             onClick={() => onSelect(sheet.name)}
+            title={truncada ? `Hoja recortada a ${truncada}` : ''}
           >
             <span className="sheet-dot" aria-hidden="true" />
             <span className="sheet-tab-name">{sheet.name}</span>
             <span className="sheet-tab-count">{sheet.rows}</span>
+            {truncada && (
+              <span
+                className="sheet-trunc-badge"
+                aria-label={`Hoja recortada a ${truncada}`}
+              >
+                {truncada === 'columnas' ? '⚠️ cols' : '⚠️ filas'}
+              </span>
+            )}
           </button>
         )
       })}
