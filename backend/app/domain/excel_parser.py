@@ -29,6 +29,7 @@ evita que el servicio se cuelgue.
 """
 
 import csv as csv_mod
+import posixpath
 import re
 import signal
 import sys
@@ -164,6 +165,14 @@ def _bloques(rows: list[list[Any]]) -> list[tuple[int, int]]:
     return [(limites[k], limites[k + 1]) for k in range(len(limites) - 1)]
 
 
+def _hay_numeros(rows: list[list[Any]]) -> bool:
+    return any(
+        isinstance(c, (int, float)) and not isinstance(c, bool)
+        for fila in rows
+        for c in fila
+    )
+
+
 def _es_tabla(rows: list[list[Any]]) -> bool:
     llenas = [r for r in rows if not _is_blank_row(r)]
     return len(llenas) >= 2 and max((_contar(r) for r in llenas), default=0) >= 2
@@ -221,8 +230,13 @@ def _construir_tabla(
     def _con_combinadas(fila: int) -> bool:
         return any(r0 == fila and c1 - c0 > 1 for r0, _, c0, c1 in merges)
 
+    # Solo si debajo hay datos con números: unos grupos combinados sobre filas
+    # de puro texto no son una cabecera de dos niveles (H-01, 2.ª ronda).
     dos_niveles = (
-        h + 1 < b and _con_combinadas(h) and _fila_cabecera(rows[h + 1])
+        h + 1 < b
+        and _con_combinadas(h)
+        and _fila_cabecera(rows[h + 1])
+        and _hay_numeros(rows[h + 2 : h + 7])
     )
     if (
         not dos_niveles
@@ -230,6 +244,7 @@ def _construir_tabla(
         and _con_combinadas(h - 1)
         and _fila_cabecera(rows[h])
         and len(set(_row_text_cells(rows[h - 1]))) >= 2
+        and _hay_numeros(rows[h + 1 : h + 6])
     ):
         dos_niveles = True
         h -= 1
@@ -583,12 +598,22 @@ def _xlsx_escanear(ws, max_filas: int, max_cols: int) -> _Escaneo:
     return _Escaneo(head, todas, ultima + 1, ancho, trunc_cols, trunc_filas)
 
 
+def _xml_seguro(datos: bytes) -> bool:
+    """OOXML no lleva DTD: si aparece, el archivo se trata como manipulado."""
+    cabecera = datos[:4096]
+    return b"<!DOCTYPE" not in cabecera and b"<!ENTITY" not in cabecera
+
+
 def _xlsx_combinadas(path: str, titulo: str) -> list[tuple[int, int, int, int]]:
     """Rangos combinados de una hoja leyendo solo la etiqueta <mergeCells> del
     XML (sin cargar la hoja). Formato (fila0, fila1, col0, col1), fin exclusivo."""
     try:
         with zipfile.ZipFile(path) as zf:
-            libro = ET.fromstring(zf.read("xl/workbook.xml"))
+            datos_libro = zf.read("xl/workbook.xml")
+            datos_rels = zf.read("xl/_rels/workbook.xml.rels")
+            if not (_xml_seguro(datos_libro) and _xml_seguro(datos_rels)):
+                return []
+            libro = ET.fromstring(datos_libro)
             rid = next(
                 (
                     h.get(_NS_REL + "id")
@@ -597,7 +622,7 @@ def _xlsx_combinadas(path: str, titulo: str) -> list[tuple[int, int, int, int]]:
                 ),
                 None,
             )
-            rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            rels = ET.fromstring(datos_rels)
             destino = next(
                 (
                     r.get("Target")
@@ -608,7 +633,14 @@ def _xlsx_combinadas(path: str, titulo: str) -> list[tuple[int, int, int, int]]:
             )
             if not rid or not destino:
                 return []
-            ruta = destino.lstrip("/") if destino.startswith("/") else "xl/" + destino
+            ruta = posixpath.normpath(
+                destino.lstrip("/") if destino.startswith("/") else "xl/" + destino
+            )
+            if not ruta.startswith("xl/"):
+                return []
+            with zf.open(ruta) as fh:
+                if not _xml_seguro(fh.read(4096)):
+                    return []
             salida: list[tuple[int, int, int, int]] = []
             with zf.open(ruta) as fh:
                 for _, el in ET.iterparse(fh, events=("end",)):

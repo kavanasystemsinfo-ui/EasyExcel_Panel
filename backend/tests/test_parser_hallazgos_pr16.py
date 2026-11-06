@@ -237,3 +237,77 @@ def test_ine_real_cabecera_con_nombres_distintos_del_titulo(tabla, tmp_path):
     assert len(primera) >= 2
     # el título largo no puede repetirse como nombre de columna
     assert not any(" (2)" in c for c in cabecera)
+
+
+# ----------------------------------------------------- segunda ronda (T-030 bis)
+
+
+def test_h01_celda_combinada_en_cabecera_con_datos_de_texto_no_es_dos_niveles(tmp_path):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Texto"
+    ws["A1"] = "X"
+    ws["B1"] = "Y"
+    ws.merge_cells("B1:C1")
+    ws.append(["a", "b", "c"])
+    ws.append(["d", "e", "f"])
+    ws.append(["g", "h", "i"])
+    _, datos = _leer(_guardar(wb, tmp_path), "Texto")
+    assert datos["header"][0] == "X"
+    assert not any("·" in nombre for nombre in datos["header"])
+    assert len(datos["rows"]) == 3
+
+
+def _con_doctype(origen: Path, destino: Path) -> None:
+    import zipfile
+
+    with zipfile.ZipFile(origen) as entrada, zipfile.ZipFile(destino, "w") as salida:
+        for item in entrada.infolist():
+            datos = entrada.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                texto = datos.decode("utf-8")
+                cierre = texto.index("?>") + 2 if texto.startswith("<?xml") else 0
+                texto = (
+                    texto[:cierre]
+                    + '<!DOCTYPE x [<!ENTITY a "aaaaaaaaaa">]>'
+                    + texto[cierre:]
+                )
+                datos = texto.encode("utf-8")
+            salida.writestr(item, datos)
+
+
+def test_h03_xml_con_dtd_se_ignora_en_celdas_combinadas(tmp_path):
+    from app.domain.excel_parser import _xlsx_combinadas
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "S"
+    ws["A1"] = "T"
+    ws.merge_cells("A1:C1")
+    normal = _guardar(wb, tmp_path, "normal.xlsx")
+    assert _xlsx_combinadas(str(normal), "S") == [(0, 1, 0, 3)]
+    manipulado = tmp_path / "dtd.xlsx"
+    _con_doctype(normal, manipulado)
+    assert _xlsx_combinadas(str(manipulado), "S") == []
+
+
+def test_h03_target_fuera_de_xl_se_ignora(tmp_path):
+    import zipfile
+
+    from app.domain.excel_parser import _xlsx_combinadas
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "S"
+    ws["A1"] = "T"
+    ws.merge_cells("A1:C1")
+    normal = _guardar(wb, tmp_path, "normal2.xlsx")
+    malo = tmp_path / "target.xlsx"
+    with zipfile.ZipFile(normal) as entrada, zipfile.ZipFile(malo, "w") as salida:
+        for item in entrada.infolist():
+            datos = entrada.read(item.filename)
+            if item.filename == "xl/_rels/workbook.xml.rels":
+                datos = datos.replace(b"/xl/worksheets/sheet1.xml", b"../../x.xml")
+                datos = datos.replace(b"worksheets/sheet1.xml", b"../../x.xml")
+            salida.writestr(item, datos)
+    assert _xlsx_combinadas(str(malo), "S") == []
