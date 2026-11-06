@@ -13,3 +13,4 @@ backend/data/uploads/
 .vercel
 frontend/dist/
 frontend/node_modules/
+corpus_local/
