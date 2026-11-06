@@ -76,6 +76,7 @@ async function cargarHojas(manifest: Workbook): Promise<WorkbookFull> {
         rows,
         header_row: sheet.header_row ?? 1,
         truncada: sheet.truncada ?? null,
+        aviso: sheet.aviso ?? null,
       }
     }),
   )
@@ -243,6 +244,7 @@ function App() {
           rows: s.data,
           header_row: s.header_row ?? 1,
           truncada: s.truncada ?? null,
+          aviso: s.aviso ?? null,
         })),
       }
       instalar(wbFull, 'datos')
@@ -343,6 +345,7 @@ function App() {
       cols: h.header.length,
       header_row: h.header_row ?? 1,
       truncada: h.truncada ?? null,
+      aviso: h.aviso ?? null,
     }))
   const kpisSeccion = kpisDeSeccion(seccion)
   const graficosSeccion = graficosDeSeccion(seccion, graficosBase)

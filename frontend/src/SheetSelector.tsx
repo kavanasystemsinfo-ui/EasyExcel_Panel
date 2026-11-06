@@ -20,7 +20,11 @@ function SheetSelector({ sheets, active, onSelect }: Props) {
             aria-selected={isActive}
             className={`sheet-tab${isActive ? ' is-active' : ''}`}
             onClick={() => onSelect(sheet.name)}
-            title={truncada ? `Hoja recortada a ${truncada}` : ''}
+            title={
+              [truncada ? `Hoja recortada a ${truncada}` : '', sheet.aviso ?? '']
+                .filter(Boolean)
+                .join('. ')
+            }
           >
             <span className="sheet-dot" aria-hidden="true" />
             <span className="sheet-tab-name">{sheet.name}</span>
@@ -31,6 +35,15 @@ function SheetSelector({ sheets, active, onSelect }: Props) {
                 aria-label={`Hoja recortada a ${truncada}`}
               >
                 {truncada === 'columnas' ? '⚠️ cols' : '⚠️ filas'}
+              </span>
+            )}
+            {sheet.aviso && (
+              <span
+                className="sheet-trunc-badge"
+                role="note"
+                aria-label={sheet.aviso}
+              >
+                ℹ️ aviso
               </span>
             )}
           </button>

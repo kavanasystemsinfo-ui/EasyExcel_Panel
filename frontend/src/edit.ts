@@ -1,6 +1,6 @@
 import { norm } from './cells'
 
-export type HojaEditada = { name: string; header: string[]; rows: unknown[][]; header_row: number; truncada: 'columnas' | 'filas' | null }
+export type HojaEditada = { name: string; header: string[]; rows: unknown[][]; header_row: number; truncada: 'columnas' | 'filas' | null; aviso?: string | null }
 
 export type WorkbookFull = {
   id: string

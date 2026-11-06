@@ -18,6 +18,10 @@ class SheetInfo(BaseModel):
         default=None,
         description="'columnas' o 'filas' si la hoja se recortó por límites",
     )
+    aviso: str | None = Field(
+        default=None,
+        description="Aviso para el usuario (varias tablas, hoja grande...)",
+    )
 
 
 class WorkbookListItem(BaseModel):

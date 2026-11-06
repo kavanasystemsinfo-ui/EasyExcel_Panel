@@ -32,10 +32,13 @@ import csv as csv_mod
 import re
 import signal
 import sys
+import zipfile
+from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 import xlrd
 from odf import table as odf_table
@@ -101,46 +104,161 @@ def _row_text_cells(row: list[Any]) -> list[str]:
     return out
 
 
-def _detect_header_row(rows: list[list[Any]]) -> int:
-    """Índice (0-based) de la fila de cabecera dentro de `rows`.
+def _contar(row: list[Any]) -> int:
+    return sum(1 for c in row if _cell(c) not in ("", None))
 
-    Estrategia: saltar filas vacías y filas-título (0 o 1 celdas de texto);
-    también saltar filas duplicadas que parecen venir de celdas combinadas
-    (mismo contenido en ≥2 celdas que la fila anterior O la siguiente).
-    La primera fila con >=2 celdas de texto distintas seguida de al menos una
-    fila con datos se considera cabecera. Si nada encaja, devuelve 0 (fila 1).
+
+def _fila_cabecera(row: list[Any]) -> bool:
+    """Fila con aspecto de cabecera: >=2 textos y casi todo lo que hay es texto."""
+    textos = len(_row_text_cells(row))
+    return textos >= 2 and textos >= 0.8 * _contar(row)
+
+
+def _detect_header_row(rows: list[list[Any]]) -> int:
+    """Índice (0-based) de la fila de cabecera dentro de `rows` (SIN celdas
+    combinadas rellenadas: un título combinado a lo ancho es una sola celda).
+
+    Se salta lo que no es tabla: filas vacías, títulos (menos de 2 textos) y
+    filas mucho más estrechas que la tabla (menos de la mitad de celdas que la
+    fila más ancha de las primeras). La primera fila con >=2 textos distintos
+    seguida de filas con datos es la cabecera; si nada encaja, la fila 1.
     """
     if not rows:
         return 0
     limite = min(len(rows), _MAX_HEADER_SCAN)
+    ancho_max = max((_contar(r) for r in rows[:limite]), default=0)
     for idx in range(limite):
         row = rows[idx]
         if _is_blank_row(row):
             continue
         textos = _row_text_cells(row)
-        # Fila-título: una sola celda con texto -> seguir buscando
-        if len(textos) < 2:
+        if len(set(textos)) < 2:
             continue
-        # Filas duplicadas (posibles celdas combinadas rellenadas): ignorar
-        # Comprobar contra fila anterior
-        if idx > 0 and len(textos) >= 2:
-            prev_textos = _row_text_cells(rows[idx - 1])
-            if textos == prev_textos and len(textos) == len(prev_textos):
-                continue
-        # Comprobar contra fila siguiente (merged cells propagan hacia abajo)
-        if idx + 1 < len(rows):
-            next_textos = _row_text_cells(rows[idx + 1])
-            if textos == next_textos and len(textos) == len(next_textos):
-                continue
-        # ¿Hay filas con datos después?
-        hay_datos = False
-        for j in range(idx + 1, min(len(rows), idx + 5)):
-            if not _is_blank_row(rows[j]):
-                hay_datos = True
-                break
-        if hay_datos:
+        if _contar(row) * 2 < ancho_max:
+            continue
+        siguientes = range(idx + 1, min(len(rows), idx + 5))
+        if any(not _is_blank_row(rows[j]) for j in siguientes):
             return idx
     return 0
+
+
+def _bloques(rows: list[list[Any]]) -> list[tuple[int, int]]:
+    """Trozos de la hoja separados por filas vacías cuando lo que sigue empieza
+    con una fila de cabecera (otra tabla). Una fila vacía suelta dentro de los
+    datos no corta."""
+    cortes: list[int] = []
+    visto = False
+    for i, row in enumerate(rows):
+        if _is_blank_row(row):
+            continue
+        if (
+            visto
+            and _is_blank_row(rows[i - 1])
+            and _fila_cabecera(row)
+            and i + 1 < len(rows)
+            and not _is_blank_row(rows[i + 1])
+        ):
+            cortes.append(i)
+        visto = True
+    limites = [0, *cortes, len(rows)]
+    return [(limites[k], limites[k + 1]) for k in range(len(limites) - 1)]
+
+
+def _es_tabla(rows: list[list[Any]]) -> bool:
+    llenas = [r for r in rows if not _is_blank_row(r)]
+    return len(llenas) >= 2 and max((_contar(r) for r in llenas), default=0) >= 2
+
+
+AVISO_VARIAS_TABLAS = "La hoja tiene varias tablas; se muestra la principal"
+AVISO_HOJA_GRANDE = (
+    "Hoja grande: no se rellenaron celdas combinadas ni se buscaron varias tablas"
+)
+
+
+def _rellenar_combinadas(
+    rows: list[list[Any]],
+    merges: list[tuple[int, int, int, int]],
+    desde: int,
+    hasta: int,
+    max_cols: int,
+) -> None:
+    """Propaga el valor ancla de cada rango combinado (r0, r1, c0, c1 con fin
+    exclusivo, base 0) dentro de [desde, hasta). Lo anterior a `desde` (títulos)
+    no se toca."""
+    for r0, r1, c0, c1 in merges:
+        if r0 < desde or r0 >= hasta or c0 >= max_cols:
+            continue
+        ancla = rows[r0]
+        valor = ancla[c0] if c0 < len(ancla) else None
+        if valor in (None, ""):
+            continue
+        for rr in range(r0, min(r1, hasta)):
+            fila = rows[rr]
+            for cc in range(c0, min(c1, max_cols)):
+                if rr == r0 and cc == c0:
+                    continue
+                while len(fila) <= cc:
+                    fila.append(None)
+                fila[cc] = valor
+
+
+def _construir_tabla(
+    rows: list[list[Any]], merges: list[tuple[int, int, int, int]], max_cols: int
+) -> dict:
+    """Localiza la tabla principal de la hoja y devuelve su cabecera y datos."""
+    if not rows:
+        return {"header": [], "data": [], "header_row": 1, "aviso": None, "cols": 0}
+    bloques = _bloques(rows)
+    pesos = [sum(_contar(r) for r in rows[a:b]) for a, b in bloques]
+    a, b = bloques[pesos.index(max(pesos))]
+    while b > a + 1 and _is_blank_row(rows[b - 1]):
+        b -= 1
+    tablas = sum(1 for x, y in bloques if _es_tabla(rows[x:y]))
+    aviso = AVISO_VARIAS_TABLAS if tablas > 1 else None
+    h = a + _detect_header_row(rows[a:b])
+    # Cabecera de dos niveles: una fila de grupos con celdas combinadas a lo
+    # ancho, justo encima o justo debajo de la fila de subcolumnas.
+    def _con_combinadas(fila: int) -> bool:
+        return any(r0 == fila and c1 - c0 > 1 for r0, _, c0, c1 in merges)
+
+    dos_niveles = (
+        h + 1 < b and _con_combinadas(h) and _fila_cabecera(rows[h + 1])
+    )
+    if (
+        not dos_niveles
+        and h - 1 >= a
+        and _con_combinadas(h - 1)
+        and _fila_cabecera(rows[h])
+        and len(set(_row_text_cells(rows[h - 1]))) >= 2
+    ):
+        dos_niveles = True
+        h -= 1
+    _rellenar_combinadas(rows, merges, h, b, max_cols)
+    filas = rows[h:b]
+    cols = min(max((_width(tuple(r)) for r in filas), default=0), max_cols)
+    if dos_niveles:
+        grupo, sub = filas[0], filas[1]
+        ancho = max(cols, _width(tuple(grupo)), _width(tuple(sub)))
+        crudo: list[Any] = []
+        for c in range(ancho):
+            g = _cell(grupo[c]) if c < len(grupo) else ""
+            sv = _cell(sub[c]) if c < len(sub) else ""
+            if g != "" and sv != "" and str(g) != str(sv):
+                crudo.append(f"{g} · {sv}")
+            else:
+                crudo.append(sv or g)
+        datos = filas[2:]
+    else:
+        crudo = [_cell(v) for v in filas[0]]
+        ancho = max(cols, _width(tuple(filas[0])))
+        datos = filas[1:]
+    return {
+        "header": _normalize_header(crudo, ancho),
+        "data": datos,
+        "header_row": h + 1,
+        "aviso": aviso,
+        "cols": cols,
+    }
 
 
 def _normalize_header(header_raw: list[Any], total_cols: int) -> list[str]:
@@ -172,8 +290,6 @@ OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
 def _detect_format(path: str) -> str:
-    import zipfile
-
     with open(path, "rb") as fh:
         head = fh.read(8)
     if head.startswith(b"PK\x03\x04"):
@@ -268,24 +384,15 @@ def _load_xls(path: str) -> list[dict]:
                 else:
                     fila.append(str(cell.value))
             filas.append(fila)
-        # Rellenar celdas combinadas: propagar el ancla dentro del rango,
-        # limitado a las filas cargadas y a max_cols.
-        for rlo, rhi, clo, chi in merged:
-            if rlo >= len(filas) or clo >= max_cols:
-                continue
-            valor = filas[rlo][clo] if len(filas[rlo]) > clo else ""
-            if valor in ("", None):
-                continue
-            for rr in range(rlo, min(rhi, len(filas))):
-                for cc in range(clo, min(chi, max_cols)):
-                    if rr == rlo and cc == clo:
-                        continue
-                    filas[rr][cc] = valor
+        combinadas = [
+            (rlo, rhi, clo, chi) for rlo, rhi, clo, chi in merged if clo < max_cols
+        ]
         sheets.append(
             {
                 "name": sh.name,
                 "rows": filas,
                 "truncada": "columnas" if truncada_cols else None,
+                "merges": combinadas,
             }
         )
     return sheets
@@ -319,8 +426,7 @@ def _load_ods(path: str) -> list[dict]:
         name = tbl.getAttribute("name") or "Hoja"
         filas: list[list[Any]] = []
         truncada_cols = False
-        # Spans verticales pendientes de propagar: {col: (valor, filas_restantes)}
-        rowspan_activos: dict[int, tuple[Any, int]] = {}
+        combinadas: list[tuple[int, int, int, int]] = []
         for row in tbl.getElementsByType(odf_table.TableRow):
             repeticiones = int(row.getAttribute("numberrowsrepeated") or 1)
             celdas: list[Any] = []
@@ -330,7 +436,10 @@ def _load_ods(path: str) -> list[dict]:
                 if qname is None or qname[1] not in ("table-cell", "covered-table-cell"):
                     continue
                 repeat = int(node.getAttribute("numbercolumnsrepeated") or 1)
-                rowspan = int(node.getAttribute("numberrowsspanned") or 1)
+                rowspan = colspan = 1
+                if qname[1] == "table-cell":
+                    rowspan = int(node.getAttribute("numberrowsspanned") or 1)
+                    colspan = int(node.getAttribute("numbercolumnsspanned") or 1)
                 value = _ods_cell_value(node)
                 efectivas = min(repeat, max_cols - col_idx)
                 if efectivas <= 0:
@@ -338,28 +447,19 @@ def _load_ods(path: str) -> list[dict]:
                     break
                 if repeat > efectivas:
                     truncada_cols = True
-                for offset in range(efectivas):
+                if (rowspan > 1 or colspan > 1) and repeat == 1 and repeticiones == 1:
+                    combinadas.append(
+                        (len(filas), len(filas) + rowspan, col_idx, col_idx + colspan)
+                    )
+                for _ in range(efectivas):
                     celdas.append(value)
-                    if rowspan > 1:
-                        rowspan_activos[col_idx + offset] = (value, rowspan - 1)
                 col_idx += efectivas
             # LibreOffice rellena el final con filas vacias repetidas:
             # no materializar ese padding (dispararia falsos limites).
             if repeticiones > 1 and all(c == "" for c in celdas):
                 continue
             for _ in range(min(repeticiones, max_filas - len(filas))):
-                # Aplicar rowspans activos sobre la fila que se va a añadir
-                fila_vals = list(celdas)
-                for col, (valor, restantes) in list(rowspan_activos.items()):
-                    if restantes > 0 and col < len(fila_vals):
-                        fila_vals[col] = valor
-                filas.append(fila_vals)
-                # Decrementar rowspans
-                for col, (valor, restantes) in list(rowspan_activos.items()):
-                    if restantes > 0:
-                        rowspan_activos[col] = (valor, restantes - 1)
-                    else:
-                        del rowspan_activos[col]
+                filas.append(list(celdas))
             if len(filas) >= max_filas:
                 break
         sheets.append(
@@ -367,6 +467,7 @@ def _load_ods(path: str) -> list[dict]:
                 "name": name,
                 "rows": filas,
                 "truncada": "columnas" if truncada_cols else None,
+                "merges": combinadas,
             }
         )
     return sheets
@@ -385,24 +486,32 @@ def _load_sheets(path: str, fmt: str, nombre: str | None) -> list[dict]:
 def _metadata_from_rows(sheets: list[dict]) -> list[dict]:
     out: list[dict] = []
     for sheet in sheets:
-        rows = sheet["rows"]
-        cols = max((_width(tuple(r)) for r in rows), default=0)
-        cols = min(cols, settings.max_columns)
-        hdr_idx = _detect_header_row(rows)
-        data_rows = max(len(rows) - hdr_idx - 1, 0)
+        t = _construir_tabla(
+            sheet["rows"], sheet.get("merges", []), settings.max_columns
+        )
+        n = len(t["data"])
         truncada = sheet.get("truncada")
-        if not truncada and data_rows > settings.max_rows_per_sheet:
+        if not truncada and n > settings.max_rows_per_sheet:
             truncada = "filas"
         out.append(
             {
                 "name": sheet["name"],
-                "rows": min(data_rows, settings.max_rows_per_sheet),
-                "cols": cols,
-                "header_row": hdr_idx + 1,
+                "rows": min(n, settings.max_rows_per_sheet),
+                "cols": t["cols"],
+                "header_row": t["header_row"],
                 "truncada": truncada,
+                "aviso": t["aviso"],
             }
         )
     return out
+
+
+def _pagina(t: dict, offset: int, limit: int) -> dict:
+    header = t["header"]
+    data = t["data"][: settings.max_rows_per_sheet]
+    ancho = len(header)
+    page = [[_cell(v) for v in row[:ancho]] for row in data[offset : offset + limit]]
+    return {"header": header, "rows": page, "total": len(data)}
 
 
 def _read_rows_from_sheets(
@@ -411,92 +520,154 @@ def _read_rows_from_sheets(
     match = next((s for s in sheets if s["name"] == sheet), None)
     if match is None:
         raise WorkbookNotFoundError(f"La hoja '{sheet}' no existe")
-    rows = match["rows"]
-    hdr_idx = _detect_header_row(rows)
-    header_raw = rows[hdr_idx] if rows else []
-    cols = max((_width(tuple(r)) for r in rows), default=0)
-    cols = min(cols, settings.max_columns)
-    ancho = max(cols, _width(tuple(header_raw)))
-    header = _normalize_header([_cell(v) for v in header_raw], ancho)
-    data = rows[hdr_idx + 1 :]
-    if len(data) > settings.max_rows_per_sheet:
-        data = data[: settings.max_rows_per_sheet]
-    page = [[_cell(value) for value in row[:ancho]] for row in data[offset : offset + limit]]
-    return {"header": header, "rows": page, "total": len(data)}
+    t = _construir_tabla(match["rows"], match.get("merges", []), settings.max_columns)
+    return _pagina(t, offset, limit)
 
 
 # ------------------------------------------------------------------ xlsx
 
+# Hojas con más celdas que esto no se guardan enteras en memoria: se recorren en
+# streaming (read_only), sin relleno de celdas combinadas ni búsqueda de varias
+# tablas (H5 de la auditoría del PR #16: 4,4 M de celdas = 534 MB de RSS).
+_CELDAS_RELLENO_MAX = 250_000
+_FILAS_CABECERA = _MAX_HEADER_SCAN + 10
 
-def _xlsx_sheet_rows(
-    ws, max_filas: int, max_cols: int
-) -> tuple[list[list[Any]], str | None]:
-    """Lee filas de una hoja xlsx (modo normal, no read_only) con relleno de merged cells.
+_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_NS_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+_NS_PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 
-    Devuelve (filas, truncada_columnas). El modo no-read_only es necesario
-    para acceder a ws.merged_cells; el coste se documenta en el docstring del
-    módulo y lo acota el timeout del parser.
-    """
-    # Usar límites reales de la hoja, no los de configuración, para evitar
-    # iterar sobre celdas vacías innecesarias (en modo no-read_only es muy lento).
-    real_max_row = ws.max_row or 0
-    real_max_col = ws.max_column or 0
-    read_max_row = min(max_filas, real_max_row)
-    read_max_col = min(max_cols, real_max_col)
-    truncada_cols = bool(real_max_col > max_cols)
-    truncada_rows = bool(real_max_row > max_filas)
-    filas: list[list[Any]] = []
-    for row in ws.iter_rows(
-        min_row=1, max_row=read_max_row, max_col=read_max_col, values_only=True
-    ):
-        filas.append(list(row))
-    # Rellenar merged cells: propagar el valor del ancla (esquina superior
-    # izquierda) hacia abajo y a la derecha, dentro de los límites cargados.
-    for merged in ws.merged_cells.ranges:
-        min_col, min_row, max_col_r, max_row_r = range_boundaries(str(merged))
-        if min_row > len(filas) or min_col > max_cols:
-            continue
-        anchor_row = filas[min_row - 1]
-        if len(anchor_row) < min_col:
-            continue
-        anchor_val = anchor_row[min_col - 1]
-        if anchor_val is None:
-            continue
-        for rr in range(min_row, min(max_row_r, len(filas)) + 1):
-            for cc in range(min_col, min(max_col_r, max_cols) + 1):
-                if rr == min_row and cc == min_col:
-                    continue
-                while len(filas[rr - 1]) < cc:
-                    filas[rr - 1].append(None)
-                filas[rr - 1][cc - 1] = anchor_val
-    truncada = None
-    if truncada_cols:
-        truncada = "columnas"
-    elif truncada_rows:
-        truncada = "filas"
-    return filas, truncada
+
+@dataclass
+class _Escaneo:
+    head: list[list[Any]]
+    todas: list[list[Any]] | None  # None si la hoja es demasiado grande
+    n_filas: int
+    ancho: int
+    trunc_cols: bool
+    trunc_filas: bool
+
+
+def _xlsx_escanear(ws, max_filas: int, max_cols: int) -> _Escaneo:
+    """Recorre una hoja en modo read_only. Guarda las filas enteras solo si la
+    hoja es pequeña; si no, solo las primeras (para localizar la cabecera)."""
+    ws.reset_dimensions()
+    head: list[list[Any]] = []
+    todas: list[list[Any]] | None = []
+    celdas = 0
+    ancho = 0
+    n = 0
+    ultima = -1
+    trunc_cols = False
+    trunc_filas = False
+    for fila in ws.iter_rows(values_only=True):
+        if n >= max_filas:
+            trunc_filas = True
+            break
+        w = _width(fila)
+        if w > max_cols:
+            trunc_cols = True
+        lista = list(fila[:max_cols])
+        ancho = max(ancho, min(w, max_cols))
+        if any(c not in (None, "") for c in lista):
+            ultima = n
+        if n < _FILAS_CABECERA:
+            head.append(lista)
+        if todas is not None:
+            todas.append(lista)
+            celdas += len(lista)
+            if celdas > _CELDAS_RELLENO_MAX:
+                todas = None
+        n += 1
+    if todas is not None:
+        del todas[ultima + 1 :]
+    return _Escaneo(head, todas, ultima + 1, ancho, trunc_cols, trunc_filas)
+
+
+def _xlsx_combinadas(path: str, titulo: str) -> list[tuple[int, int, int, int]]:
+    """Rangos combinados de una hoja leyendo solo la etiqueta <mergeCells> del
+    XML (sin cargar la hoja). Formato (fila0, fila1, col0, col1), fin exclusivo."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            libro = ET.fromstring(zf.read("xl/workbook.xml"))
+            rid = next(
+                (
+                    h.get(_NS_REL + "id")
+                    for h in libro.iter(_NS + "sheet")
+                    if h.get("name") == titulo
+                ),
+                None,
+            )
+            rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            destino = next(
+                (
+                    r.get("Target")
+                    for r in rels.iter(_NS_PKG + "Relationship")
+                    if r.get("Id") == rid
+                ),
+                None,
+            )
+            if not rid or not destino:
+                return []
+            ruta = destino.lstrip("/") if destino.startswith("/") else "xl/" + destino
+            salida: list[tuple[int, int, int, int]] = []
+            with zf.open(ruta) as fh:
+                for _, el in ET.iterparse(fh, events=("end",)):
+                    if el.tag == _NS + "mergeCell":
+                        ref = el.get("ref")
+                        if ref:
+                            c0, r0, c1, r1 = range_boundaries(ref)
+                            salida.append((r0 - 1, r1, c0 - 1, c1))
+                    elif el.tag == _NS + "mergeCells":
+                        break
+                    elif el.tag == _NS + "row":
+                        el.clear()
+            return salida
+    except (KeyError, ValueError, zipfile.BadZipFile, ET.ParseError):
+        return []
+
+
+def _xlsx_tabla(path: str, titulo: str, esc: _Escaneo) -> dict:
+    if esc.todas is not None:
+        merges = _xlsx_combinadas(path, titulo) if esc.todas else []
+        t = _construir_tabla(esc.todas, merges, settings.max_columns)
+        t["n_datos"] = len(t["data"])
+        t["grande"] = False
+        return t
+    hdr = _detect_header_row(esc.head)
+    cab = esc.head[hdr] if esc.head else []
+    ancho = max(esc.ancho, _width(tuple(cab)))
+    return {
+        "header": _normalize_header([_cell(v) for v in cab], ancho),
+        "data": [],
+        "header_row": hdr + 1,
+        "aviso": AVISO_HOJA_GRANDE,
+        "cols": esc.ancho,
+        "n_datos": max(esc.n_filas - hdr - 1, 0),
+        "grande": True,
+    }
 
 
 def _extract_metadata_sync(path: str) -> list[dict]:
-    """Extrae metadatos (detección de cabecera + merged cells; no read_only)."""
-    workbook = load_workbook(path, read_only=False, data_only=True)
+    """Metadatos de un xlsx en streaming (read_only)."""
+    workbook = load_workbook(path, read_only=True, data_only=True)
     max_filas = settings.max_rows_per_sheet + _MAX_HEADER_SCAN + 2
     sheets: list[dict] = []
     for ws in workbook.worksheets:
-        filas, truncada = _xlsx_sheet_rows(ws, max_filas, settings.max_columns)
-        cols = max((_width(tuple(r)) for r in filas), default=0)
-        cols = min(cols, settings.max_columns)
-        hdr_idx = _detect_header_row(filas)
-        data_rows = max(len(filas) - hdr_idx - 1, 0)
-        if not truncada and data_rows > settings.max_rows_per_sheet:
+        esc = _xlsx_escanear(ws, max_filas, settings.max_columns)
+        t = _xlsx_tabla(path, ws.title, esc)
+        truncada = "columnas" if esc.trunc_cols else None
+        if not truncada and (
+            esc.trunc_filas or t["n_datos"] > settings.max_rows_per_sheet
+        ):
             truncada = "filas"
         sheets.append(
             {
                 "name": ws.title,
-                "rows": min(data_rows, settings.max_rows_per_sheet),
-                "cols": cols,
-                "header_row": hdr_idx + 1,
+                "rows": min(t["n_datos"], settings.max_rows_per_sheet),
+                "cols": t["cols"],
+                "header_row": t["header_row"],
                 "truncada": truncada,
+                "aviso": t["aviso"],
             }
         )
     workbook.close()
@@ -504,26 +675,31 @@ def _extract_metadata_sync(path: str) -> list[dict]:
 
 
 def _read_rows_sync(path: str, sheet: str, offset: int, limit: int) -> dict:
-    """Lee filas con detección de cabecera y merged cells (no read_only)."""
-    workbook = load_workbook(path, read_only=False, data_only=True)
+    """Una página de filas de un xlsx. Hojas grandes: segunda pasada en
+    streaming que solo guarda la página pedida."""
+    workbook = load_workbook(path, read_only=True, data_only=True)
     if sheet not in workbook.sheetnames:
         workbook.close()
         raise WorkbookNotFoundError(f"La hoja '{sheet}' no existe")
     ws = workbook[sheet]
     max_filas = settings.max_rows_per_sheet + _MAX_HEADER_SCAN + 2
-    filas, _ = _xlsx_sheet_rows(ws, max_filas, settings.max_columns)
+    esc = _xlsx_escanear(ws, max_filas, settings.max_columns)
+    t = _xlsx_tabla(path, sheet, esc)
+    if not t["grande"]:
+        workbook.close()
+        return _pagina(t, offset, limit)
+    primera = t["header_row"] + offset  # índice base 0 de la primera fila pedida
+    tope = min(esc.n_filas, t["header_row"] + settings.max_rows_per_sheet)
+    ancho = len(t["header"])
+    page: list[list[Any]] = []
+    for i, fila in enumerate(ws.iter_rows(values_only=True)):
+        if i >= tope or len(page) >= limit:
+            break
+        if i >= primera:
+            page.append([_cell(v) for v in list(fila)[:ancho]])
     workbook.close()
-    hdr_idx = _detect_header_row(filas)
-    header_raw = filas[hdr_idx] if filas else []
-    cols = max((_width(tuple(r)) for r in filas), default=0)
-    cols = min(cols, settings.max_columns)
-    ancho = max(cols, _width(tuple(header_raw)))
-    header = _normalize_header([_cell(v) for v in header_raw], ancho)
-    data = filas[hdr_idx + 1 :]
-    if len(data) > settings.max_rows_per_sheet:
-        data = data[: settings.max_rows_per_sheet]
-    page = [[_cell(value) for value in row[:ancho]] for row in data[offset : offset + limit]]
-    return {"header": header, "rows": page, "total": len(data)}
+    total = min(t["n_datos"], settings.max_rows_per_sheet)
+    return {"header": t["header"], "rows": page, "total": total}
 
 
 def _run_with_timeout(func, *args, timeout_s: float):
