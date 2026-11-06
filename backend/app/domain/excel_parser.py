@@ -428,7 +428,9 @@ def _read_rows_from_sheets(
 # ------------------------------------------------------------------ xlsx
 
 
-def _xlsx_sheet_rows(ws, max_filas: int, max_cols: int) -> tuple[list[list[Any]], bool]:
+def _xlsx_sheet_rows(
+    ws, max_filas: int, max_cols: int
+) -> tuple[list[list[Any]], str | None]:
     """Lee filas de una hoja xlsx (modo normal, no read_only) con relleno de merged cells.
 
     Devuelve (filas, truncada_columnas). El modo no-read_only es necesario
@@ -481,12 +483,11 @@ def _extract_metadata_sync(path: str) -> list[dict]:
     max_filas = settings.max_rows_per_sheet + _MAX_HEADER_SCAN + 2
     sheets: list[dict] = []
     for ws in workbook.worksheets:
-        filas, truncada_cols = _xlsx_sheet_rows(ws, max_filas, settings.max_columns)
+        filas, truncada = _xlsx_sheet_rows(ws, max_filas, settings.max_columns)
         cols = max((_width(tuple(r)) for r in filas), default=0)
         cols = min(cols, settings.max_columns)
         hdr_idx = _detect_header_row(filas)
         data_rows = max(len(filas) - hdr_idx - 1, 0)
-        truncada = "columnas" if truncada_cols else None
         if not truncada and data_rows > settings.max_rows_per_sheet:
             truncada = "filas"
         sheets.append(
