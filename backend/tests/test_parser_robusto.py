@@ -9,13 +9,14 @@
 6. CSV con delimitador ';'
 """
 
-import pytest
-from openpyxl import Workbook
 from io import BytesIO
-from fastapi.testclient import TestClient
 
-from app.main import app
+import pytest
+from fastapi.testclient import TestClient
+from openpyxl import Workbook
+
 from app.core.config import settings
+from app.main import app
 
 CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 

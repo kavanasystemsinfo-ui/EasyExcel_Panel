@@ -444,7 +444,9 @@ def _xlsx_sheet_rows(ws, max_filas: int, max_cols: int) -> tuple[list[list[Any]]
     truncada_cols = bool(real_max_col > max_cols)
     truncada_rows = bool(real_max_row > max_filas)
     filas: list[list[Any]] = []
-    for row in ws.iter_rows(min_row=1, max_row=read_max_row, max_col=read_max_col, values_only=True):
+    for row in ws.iter_rows(
+        min_row=1, max_row=read_max_row, max_col=read_max_col, values_only=True
+    ):
         filas.append(list(row))
     # Rellenar merged cells: propagar el valor del ancla (esquina superior
     # izquierda) hacia abajo y a la derecha, dentro de los límites cargados.
