@@ -328,3 +328,102 @@ def test_columnas_vacias_a_la_izquierda_se_descartan(tmp_path):
     assert datos["header"] == ["Código", "Stock", "Estado"]
     assert meta["cols"] == 3
     assert datos["rows"][0] == ["ART-6", 60, "OK"]
+
+
+# ---------------------------------------------------------------- ronda 3
+
+
+def test_paginas_salen_de_la_cache_sin_releer_el_excel(tmp_path, monkeypatch):
+    """Tras analizar el libro, pedir páginas no vuelve a abrir el Excel."""
+    import app.domain.excel_parser as ep
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    ws.append(["Id", "Nombre", "Importe"])
+    for i in range(1, 1201):
+        ws.append([i, f"fila {i}", i * 1.5])
+    ruta = _guardar(wb, tmp_path)
+    meta = extract_metadata(ruta)
+    assert meta[0]["rows"] == 1200
+
+    def prohibido(*a, **k):
+        raise AssertionError("no debe releer el Excel")
+
+    monkeypatch.setattr(ep, "load_workbook", prohibido)
+    p0 = read_rows(ruta, "Datos", 0, 500)
+    p2 = read_rows(ruta, "Datos", 1000, 500)
+    medio = read_rows(ruta, "Datos", 437, 3)
+    assert p0["total"] == 1200 and p0["rows"][0] == [1, "fila 1", 1.5]
+    assert len(p2["rows"]) == 200 and p2["rows"][-1][0] == 1200
+    assert [r[0] for r in medio["rows"]] == [438, 439, 440]
+
+
+def test_cache_se_invalida_si_el_archivo_cambia(tmp_path):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    ws.append(["Id", "Nombre"])
+    ws.append([1, "a"])
+    ws.append([2, "b"])
+    ruta = _guardar(wb, tmp_path)
+    extract_metadata(ruta)
+    assert read_rows(ruta, "Datos", 0, 10)["total"] == 2
+    ws.append([3, "c"])
+    wb.save(ruta)
+    assert read_rows(ruta, "Datos", 0, 10)["total"] == 3
+
+
+def test_h02_cabecera_de_anios_con_titulo_encima(tmp_path):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Serie"
+    ws["A1"] = "Evolución por región"
+    ws.append([])
+    ws.append(["Región", 2019, 2020, 2021])
+    ws.append(["Norte", "Oeste", 10, 20])
+    ws.append(["Sur", "Este", 30, 40])
+    ws.append(["Centro", "Medio", 50, 60])
+    meta, datos = _leer(_guardar(wb, tmp_path), "Serie")
+    assert meta["header_row"] == 3
+    assert datos["header"][:4] == ["Región", "2019", "2020", "2021"]
+    assert meta["rows"] == 3
+
+
+def test_h02_cabecera_de_fechas(tmp_path):
+    from datetime import datetime as dt
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Mensual"
+    ws["A1"] = "Ventas mensuales"
+    ws.append(["Producto", dt(2025, 1, 1), dt(2025, 2, 1), dt(2025, 3, 1)])
+    ws.append(["Tornillo", 1, 2, 3])
+    ws.append(["Tuerca", 4, 5, 6])
+    meta, datos = _leer(_guardar(wb, tmp_path), "Mensual")
+    assert meta["header_row"] == 2
+    assert datos["header"] == ["Producto", "2025-01-01", "2025-02-01", "2025-03-01"]
+
+
+def test_hoja_grande_rellena_celdas_combinadas_en_streaming(tmp_path):
+    """Más de 250.000 celdas: sin cargar la hoja entera, pero con el valor de
+    las celdas combinadas repetido en cada fila (antes salía vacío)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Grande"
+    ws.append(["Zona"] + [f"c{i}" for i in range(1, 100)])
+    for r in range(2, 3002):
+        ws.cell(row=r, column=1, value="Norte" if r < 1502 else "Sur") if r in (2, 1502) else None
+        for c in range(2, 101):
+            ws.cell(row=r, column=c, value=r * c)
+    ws.merge_cells("A2:A1501")
+    ws.merge_cells("A1502:A3001")
+    ruta = _guardar(wb, tmp_path)
+    meta = next(s for s in extract_metadata(ruta) if s["name"] == "Grande")
+    assert meta["aviso"] and "varias tablas" in meta["aviso"]
+    p = read_rows(ruta, "Grande", 0, 3000)
+    assert p["total"] == 3000
+    zonas = [fila[0] for fila in p["rows"]]
+    assert zonas[0] == "Norte" and zonas[1499] == "Norte"
+    assert zonas[1500] == "Sur" and zonas[2999] == "Sur"
+    assert p["rows"][5][1] == 7 * 2
