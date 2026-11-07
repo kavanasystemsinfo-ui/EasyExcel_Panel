@@ -122,6 +122,9 @@ async def upload_workbook(
                     "name": s["name"],
                     "rows": s["rows"],
                     "cols": s["cols"],
+                    "header_row": s.get("header_row", 1),
+                    "truncada": s.get("truncada"),
+                    "aviso": s.get("aviso"),
                     "header": payload.get("header", []),
                     "data": payload.get("rows", []),
                 }

@@ -9,8 +9,19 @@ from app.core.config import settings
 
 class SheetInfo(BaseModel):
     name: str
-    rows: int = Field(description="Filas de datos (sin la cabecera de la fila 1)")
+    rows: int = Field(description="Filas de datos (sin la cabecera)")
     cols: int
+    header_row: int = Field(
+        default=1, description="Fila de la cabecera (1-based) en la hoja original"
+    )
+    truncada: str | None = Field(
+        default=None,
+        description="'columnas' o 'filas' si la hoja se recortó por límites",
+    )
+    aviso: str | None = Field(
+        default=None,
+        description="Aviso para el usuario (varias tablas, hoja grande...)",
+    )
 
 
 class WorkbookListItem(BaseModel):

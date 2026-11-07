@@ -24,6 +24,8 @@ function wbBase(): WorkbookFull {
           ['Sofa', 3],
           ['Mesa', 1],
         ],
+        header_row: 1,
+        truncada: null,
       },
     ],
   }
@@ -120,7 +122,7 @@ describe('hojaDe', () => {
 describe('a partir de un workbook con varias hojas', () => {
   it('solo afecta a la hoja indicada', () => {
     const wb = wbBase()
-    wb.hojas.push({ name: 'Otra', header: ['A'], rows: [['1']] })
+    wb.hojas.push({ name: 'Otra', header: ['A'], rows: [['1']], header_row: 1, truncada: null })
     const next = borrarFila(wb, 'Ventas', 0)
     expect(next.hojas[0].rows).toHaveLength(1)
     expect(next.hojas[1].rows).toEqual([['1']])

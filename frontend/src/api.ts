@@ -2,6 +2,9 @@ export type SheetInfo = {
   name: string
   rows: number
   cols: number
+  header_row: number
+  truncada: 'columnas' | 'filas' | null
+  aviso?: string | null
 }
 
 export type SheetData = SheetInfo & {

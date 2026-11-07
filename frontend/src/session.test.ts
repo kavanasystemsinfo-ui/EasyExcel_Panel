@@ -13,7 +13,7 @@ const wb: WorkbookFull = {
   id: 'abc',
   filename: 'demo.xlsx',
   uploaded_at: '2026-10-05T00:00:00+00:00',
-  hojas: [{ name: 'Ventas', header: ['A'], rows: [['1']] }],
+  hojas: [{ name: 'Ventas', header: ['A'], rows: [['1']], header_row: 1, truncada: null }],
 }
 
 afterEach(() => {
