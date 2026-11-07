@@ -29,6 +29,9 @@ evita que el servicio se cuelgue.
 """
 
 import csv as csv_mod
+import hashlib
+import json
+import os
 import posixpath
 import re
 import signal
@@ -115,6 +118,42 @@ def _fila_cabecera(row: list[Any]) -> bool:
     return textos >= 2 and textos >= 0.8 * _contar(row)
 
 
+def _fila_cabecera_serie(row: list[Any]) -> bool:
+    """Fila de cabecera hecha de años o fechas crecientes (o decrecientes), con a
+    lo sumo un texto (la etiqueta de la primera columna): 2019, 2020, 2021..."""
+    llenas = [c for c in row if c not in (None, "")]
+    textos = [c for c in llenas if isinstance(c, str)]
+    resto = [c for c in llenas if not isinstance(c, str)]
+    if len(resto) < 3 or len(textos) > 1:
+        return False
+    claves: list[int] = []
+    tipo = ""
+    for c in resto:
+        if isinstance(c, bool):
+            return False
+        if isinstance(c, (datetime, date)):
+            clave, t = c.toordinal(), "d"
+        elif isinstance(c, (int, float)) and float(c).is_integer() and 1900 <= c <= 2200:
+            clave, t = int(c), "n"
+        else:
+            return False
+        if tipo and tipo != t:
+            return False
+        tipo = t
+        claves.append(clave)
+    pares = list(zip(claves, claves[1:], strict=False))
+    return all(a < b for a, b in pares) or all(a > b for a, b in pares)
+
+
+def _cab(value: Any) -> Any:
+    """Nombre de columna: 2019.0 -> 2019 y fecha a medianoche -> solo la fecha."""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, datetime) and value.time() == datetime.min.time():
+        return value.date().isoformat()
+    return _cell(value)
+
+
 def _detect_header_row(rows: list[list[Any]]) -> int:
     """Índice (0-based) de la fila de cabecera dentro de `rows` (SIN celdas
     combinadas rellenadas: un título combinado a lo ancho es una sola celda).
@@ -133,7 +172,7 @@ def _detect_header_row(rows: list[list[Any]]) -> int:
         if _is_blank_row(row):
             continue
         textos = _row_text_cells(row)
-        if len(set(textos)) < 2:
+        if len(set(textos)) < 2 and not _fila_cabecera_serie(row):
             continue
         if _contar(row) * 2 < ancho_max:
             continue
@@ -180,7 +219,7 @@ def _es_tabla(rows: list[list[Any]]) -> bool:
 
 AVISO_VARIAS_TABLAS = "La hoja tiene varias tablas; se muestra la principal"
 AVISO_HOJA_GRANDE = (
-    "Hoja grande: no se rellenaron celdas combinadas ni se buscaron varias tablas"
+    "Hoja grande: no se buscaron varias tablas (se muestra la primera)"
 )
 
 
@@ -256,15 +295,15 @@ def _construir_tabla(
         ancho = max(cols, _width(tuple(grupo)), _width(tuple(sub)))
         crudo: list[Any] = []
         for c in range(ancho):
-            g = _cell(grupo[c]) if c < len(grupo) else ""
-            sv = _cell(sub[c]) if c < len(sub) else ""
+            g = _cab(grupo[c]) if c < len(grupo) else ""
+            sv = _cab(sub[c]) if c < len(sub) else ""
             if g != "" and sv != "" and str(g) != str(sv):
                 crudo.append(f"{g} · {sv}")
             else:
                 crudo.append(sv or g)
         datos = filas[2:]
     else:
-        crudo = [_cell(v) for v in filas[0]]
+        crudo = [_cab(v) for v in filas[0]]
         ancho = max(cols, _width(tuple(filas[0])))
         datos = filas[1:]
     # Columnas sin cabecera y sin ningún dato (típico: tabla que empieza en C5):
@@ -510,13 +549,15 @@ def _load_sheets(path: str, fmt: str, nombre: str | None) -> list[dict]:
     raise InvalidWorkbookError(f"Formato no soportado: .{fmt}")
 
 
-def _metadata_from_rows(sheets: list[dict]) -> list[dict]:
+def _metadata_from_rows(sheets: list[dict], path: str | None = None) -> list[dict]:
     out: list[dict] = []
     for sheet in sheets:
         t = _construir_tabla(
             sheet["rows"], sheet.get("merges", []), settings.max_columns
         )
         n = len(t["data"])
+        if path is not None:
+            _guardar_cache_tabla(path, sheet["name"], t)
         truncada = sheet.get("truncada")
         if not truncada and n > settings.max_rows_per_sheet:
             truncada = "filas"
@@ -551,6 +592,161 @@ def _read_rows_from_sheets(
     return _pagina(t, offset, limit)
 
 
+# ------------------------------------------------------- caché por hoja
+#
+# Cada hoja se analiza UNA vez (al subir el archivo) y la tabla resultante se
+# guarda junto al libro: una fila JSON por línea más un índice cada
+# _PUNTO_CACHE filas. Una página se sirve con un seek, sin releer el Excel.
+# La firma (tamaño + mtime) del libro invalida la caché si el archivo cambia.
+
+_PUNTO_CACHE = 200
+_VERSION_CACHE = 1
+
+
+def _base_cache(path: str, hoja: str) -> str:
+    return f"{path}.{hashlib.sha1(hoja.encode('utf-8')).hexdigest()[:12]}"
+
+
+def _firma(path: str) -> list[int]:
+    st = os.stat(path)
+    return [st.st_size, st.st_mtime_ns]
+
+
+class _EscritorCache:
+    def __init__(self, path: str, hoja: str) -> None:
+        self.path = path
+        self.base = _base_cache(path, hoja)
+        self.roto = False
+        self.n = 0
+        self.puntos = [0]
+        self.tope = settings.max_rows_per_sheet
+        self.f: Any = None
+        try:
+            self.f = open(self.base + ".jsonl.tmp", "wb")  # noqa: SIM115
+        except OSError:
+            self.f = None
+            self.roto = True
+
+    def fila(self, fila: list[Any]) -> None:
+        if self.roto or self.n >= self.tope:
+            return
+        try:
+            if self.n and self.n % _PUNTO_CACHE == 0:
+                self.puntos.append(self.f.tell())
+            linea = json.dumps(fila, ensure_ascii=False, separators=(",", ":"))
+            self.f.write(linea.encode("utf-8") + b"\n")
+            self.n += 1
+        except OSError:
+            self.roto = True
+
+    def cerrar(self, header: list[str], total: int) -> None:
+        if self.f is None:
+            return
+        try:
+            self.f.close()
+            if self.roto:
+                os.remove(self.base + ".jsonl.tmp")
+                return
+            os.replace(self.base + ".jsonl.tmp", self.base + ".jsonl")
+            meta = {
+                "v": _VERSION_CACHE,
+                "firma": _firma(self.path),
+                "header": header,
+                "total": min(total, self.n),
+                "puntos": self.puntos,
+            }
+            with open(self.base + ".json.tmp", "w", encoding="utf-8") as fh:
+                json.dump(meta, fh, ensure_ascii=False)
+            os.replace(self.base + ".json.tmp", self.base + ".json")
+        except OSError:
+            self.roto = True
+
+
+def _guardar_cache_tabla(path: str, hoja: str, t: dict) -> None:
+    w = _EscritorCache(path, hoja)
+    ancho = len(t["header"])
+    for fila in t["data"][: settings.max_rows_per_sheet]:
+        w.fila([_cell(v) for v in fila[:ancho]])
+    w.cerrar(t["header"], min(len(t["data"]), settings.max_rows_per_sheet))
+
+
+def _leer_cache(path: str, hoja: str, offset: int, limit: int) -> dict | None:
+    base = _base_cache(path, hoja)
+    try:
+        with open(base + ".json", encoding="utf-8") as fh:
+            meta = json.load(fh)
+        if meta.get("v") != _VERSION_CACHE or meta.get("firma") != _firma(path):
+            return None
+        total = int(meta["total"])
+        ancho = len(meta["header"])
+        filas: list[list[Any]] = []
+        if offset < total:
+            with open(base + ".jsonl", "rb") as fh:
+                fh.seek(meta["puntos"][offset // _PUNTO_CACHE])
+                for _ in range(offset % _PUNTO_CACHE):
+                    fh.readline()
+                for _ in range(min(limit, total - offset)):
+                    linea = fh.readline()
+                    if not linea:
+                        break
+                    filas.append(json.loads(linea)[:ancho])
+        return {"header": meta["header"], "rows": filas, "total": total}
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
+class _Sumidero:
+    """Hojas grandes: recibe las filas en streaming, rellena las celdas
+    combinadas (de la cabecera hacia abajo) y las escribe en la caché."""
+
+    def __init__(self, path: str, hoja: str, max_cols: int) -> None:
+        self.path = path
+        self.hoja = hoja
+        self.max_cols = max_cols
+        self.escritor: _EscritorCache | None = None
+        self.h0 = 0
+        self.por_fila: dict[int, list[tuple[int, int, int, int]]] = {}
+        self.activos: list[tuple[int, int, int, Any]] = []
+
+    def iniciar(self, filas: list[list[Any]]) -> None:
+        self.h0 = _detect_header_row(filas[:_FILAS_CABECERA])
+        for m in _xlsx_combinadas(self.path, self.hoja):
+            if m[0] >= self.h0 and m[2] < self.max_cols:
+                self.por_fila.setdefault(m[0], []).append(m)
+        self.escritor = _EscritorCache(self.path, self.hoja)
+        for i in range(self.h0, len(filas)):
+            self.fila(i, filas[i])
+
+    def fila(self, i: int, fila: list[Any]) -> None:
+        if i < self.h0 or self.escritor is None:
+            return
+        fila = list(fila)
+
+        def poner(c0: int, c1: int, valor: Any) -> None:
+            for cc in range(c0, min(c1, self.max_cols)):
+                while len(fila) <= cc:
+                    fila.append(None)
+                fila[cc] = valor
+
+        if self.activos:
+            self.activos = [a for a in self.activos if a[0] > i]
+            for _, c0, c1, valor in self.activos:
+                poner(c0, c1, valor)
+        for _r0, r1, c0, c1 in self.por_fila.pop(i, []):
+            valor = fila[c0] if c0 < len(fila) else None
+            if valor in (None, ""):
+                continue
+            poner(c0 + 1, c1, valor)
+            if r1 > i + 1:
+                self.activos.append((r1, c0, c1, valor))
+        if i > self.h0:
+            self.escritor.fila([_cell(v) for v in fila])
+
+    def cerrar(self, header: list[str], total: int) -> None:
+        if self.escritor is not None:
+            self.escritor.cerrar(header, total)
+
+
 # ------------------------------------------------------------------ xlsx
 
 # Hojas con más celdas que esto no se guardan enteras en memoria: se recorren en
@@ -574,7 +770,9 @@ class _Escaneo:
     trunc_filas: bool
 
 
-def _xlsx_escanear(ws, max_filas: int, max_cols: int) -> _Escaneo:
+def _xlsx_escanear(
+    ws, max_filas: int, max_cols: int, sumidero: "_Sumidero | None" = None
+) -> _Escaneo:
     """Recorre una hoja en modo read_only. Guarda las filas enteras solo si la
     hoja es pequeña; si no, solo las primeras (para localizar la cabecera)."""
     ws.reset_dimensions()
@@ -603,7 +801,11 @@ def _xlsx_escanear(ws, max_filas: int, max_cols: int) -> _Escaneo:
             todas.append(lista)
             celdas += len(lista)
             if celdas > _CELDAS_RELLENO_MAX:
+                if sumidero is not None:
+                    sumidero.iniciar(todas)
                 todas = None
+        elif sumidero is not None:
+            sumidero.fila(n, lista)
         n += 1
     if todas is not None:
         del todas[ultima + 1 :]
@@ -681,7 +883,7 @@ def _xlsx_tabla(path: str, titulo: str, esc: _Escaneo) -> dict:
     cab = esc.head[hdr] if esc.head else []
     ancho = max(esc.ancho, _width(tuple(cab)))
     return {
-        "header": _normalize_header([_cell(v) for v in cab], ancho),
+        "header": _normalize_header([_cab(v) for v in cab], ancho),
         "data": [],
         "header_row": hdr + 1,
         "aviso": AVISO_HOJA_GRANDE,
@@ -697,8 +899,13 @@ def _extract_metadata_sync(path: str) -> list[dict]:
     max_filas = settings.max_rows_per_sheet + _MAX_HEADER_SCAN + 2
     sheets: list[dict] = []
     for ws in workbook.worksheets:
-        esc = _xlsx_escanear(ws, max_filas, settings.max_columns)
+        sumidero = _Sumidero(path, ws.title, settings.max_columns)
+        esc = _xlsx_escanear(ws, max_filas, settings.max_columns, sumidero)
         t = _xlsx_tabla(path, ws.title, esc)
+        if t["grande"]:
+            sumidero.cerrar(t["header"], min(t["n_datos"], settings.max_rows_per_sheet))
+        else:
+            _guardar_cache_tabla(path, ws.title, t)
         truncada = "columnas" if esc.trunc_cols else None
         if not truncada and (
             esc.trunc_filas or t["n_datos"] > settings.max_rows_per_sheet
@@ -719,8 +926,15 @@ def _extract_metadata_sync(path: str) -> list[dict]:
 
 
 def _read_rows_sync(path: str, sheet: str, offset: int, limit: int) -> dict:
-    """Una página de filas de un xlsx. Hojas grandes: segunda pasada en
-    streaming que solo guarda la página pedida."""
+    """Una página de filas de un xlsx, desde la caché por hoja. Si falta, se
+    analiza el libro (que la crea); solo si no se puede escribir en disco se
+    recurre a releer el Excel en cada página."""
+    pagina = _leer_cache(path, sheet, offset, limit)
+    if pagina is None:
+        _extract_metadata_sync(path)
+        pagina = _leer_cache(path, sheet, offset, limit)
+    if pagina is not None:
+        return pagina
     workbook = load_workbook(path, read_only=True, data_only=True)
     if sheet not in workbook.sheetnames:
         workbook.close()
@@ -778,12 +992,18 @@ def _check_limits(sheets: list[dict]) -> None:
 
 
 def _extract_metadata_generic(path: str, fmt: str, nombre: str | None) -> list[dict]:
-    return _metadata_from_rows(_load_sheets(path, fmt, nombre))
+    return _metadata_from_rows(_load_sheets(path, fmt, nombre), path)
 
 
 def _read_rows_generic(
     path: str, fmt: str, nombre: str | None, sheet: str, offset: int, limit: int
 ) -> dict:
+    pagina = _leer_cache(path, sheet, offset, limit)
+    if pagina is None:
+        _extract_metadata_generic(path, fmt, nombre)
+        pagina = _leer_cache(path, sheet, offset, limit)
+    if pagina is not None:
+        return pagina
     return _read_rows_from_sheets(_load_sheets(path, fmt, nombre), sheet, offset, limit)
 
 
