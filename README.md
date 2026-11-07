@@ -216,7 +216,6 @@ frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/edit.ts         motor de edición de hojas (puro, con límites)
   src/session.ts      sesión local por visitante (sessionStorage, se borra al cerrar)
   src/copilotRender.ts  markdown del copiloto con escape de HTML (anti-XSS)
-boceto dashboard/  Boceto de UI de referencia (screen.png + DESIGN.md + code.html)
 docs/adr/  Decisiones de arquitectura (0001 stack · 0002 persistencia FS ·
            0003 sesión local · 0004 TTL · 0005 formatos · 0006 rate limit ·
            0007 acceso abierto sin auth · 0008 sector del demo)
