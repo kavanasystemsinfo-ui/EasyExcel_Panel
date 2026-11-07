@@ -6,7 +6,9 @@ import type { Alerta, Seccion } from './views'
 const HOJAS_DEMO = ['Empleados', 'Centros', 'Vacaciones', 'Contratos', 'Auditorias', 'Maquinaria']
 
 export function esLibroDemo(nombres: string[]): boolean {
-  return nombres.some((n) => HOJAS_DEMO.includes(n))
+  // Hace falta que coincidan varias hojas: 'Empleados' o 'Vacaciones' solas
+  // las tiene cualquier empresa y no convierten su libro en el demo.
+  return nombres.filter((n) => HOJAS_DEMO.includes(n)).length >= 3
 }
 
 export function seccionesDeLibro(nombres: string[]): { id: Seccion; nombre: string; icono: string }[] {
@@ -24,16 +26,31 @@ export function seccionesDeLibro(nombres: string[]): { id: Seccion; nombre: stri
   ]
 }
 
-type ColInfo = {
+export type ColInfo = {
   nombre: string
   idx: number
-  tipo: 'numerica' | 'fecha' | 'categorica' | 'id' | 'texto'
+  tipo: 'numerica' | 'fecha' | 'categorica' | 'id' | 'codigo' | 'texto'
   cardinalidad: number
   noVacios: number
   vacios: number
 }
 
-function analizarColumnas(sheet: SheetData): ColInfo[] {
+// Columnas que llevan digitos pero no son cantidades: no se suman ni se promedian.
+const RE_NOMBRE_CODIGO =
+  /(postal|zip|telefono|tfno|tlf|movil|celular|phone|fax|iban|matricula|isbn|\b(cp|dni|nif|cif|nie|ean)\b|^n[º°o]\.?$|^(ano|anio|year|ejercicio)$)/
+
+function pareceCodigo(valores: unknown[]): boolean {
+  const llenos = valores.filter((v) => String(v ?? '').trim() !== '')
+  const textos = llenos.map((v) => String(v).trim())
+  if (textos.length < 2 || !textos.every((t) => /^\d+$/.test(t))) return false
+  if (textos.some((t) => t.length > 1 && t.startsWith('0'))) return true
+  // Dígitos guardados como texto y todos de la misma longitud: código, no cantidad.
+  // Un número real de 5 cifras (21500) sí es una cantidad.
+  const largo = textos[0].length
+  return largo >= 5 && llenos.every((v) => typeof v === 'string') && textos.every((t) => t.length === largo)
+}
+
+export function analizarColumnas(sheet: SheetData): ColInfo[] {
   const total = sheet.rows.length
   return sheet.header.map((nombre, idx) => {
     let noVacios = 0
@@ -52,8 +69,11 @@ function analizarColumnas(sheet: SheetData): ColInfo[] {
     const vacios = total - noVacios
     const cardinalidad = distintos.size
     let tipo: ColInfo['tipo'] = 'texto'
-    const esIdNombre = /^(id|sku|codigo|código|ref|referencia)/i.test(nombre.trim())
+    // En cabeceras de dos niveles ("Empleado · Nº") manda el nombre de la subcolumna.
+    const base = nombre.split(' · ').pop() ?? nombre
+    const esIdNombre = /^(id|sku|codigo|código|ref|referencia)/i.test(base.trim())
     if (noVacios === 0) tipo = 'texto'
+    else if (RE_NOMBRE_CODIGO.test(norm(base)) || pareceCodigo(sheet.rows.map((f) => f[idx]))) tipo = 'codigo'
     else if (esIdNombre) tipo = 'id'
     else if (nums / noVacios >= 0.8) tipo = 'numerica'
     else if (fechas / noVacios >= 0.8) tipo = 'fecha'
@@ -225,6 +245,9 @@ export function alertasGenericas(data: Record<string, SheetData>): Alerta[] {
 
     const idCols = cols.filter((c) => c.tipo === 'id')
     for (const col of idCols) {
+      // Una columna "Código" que se repite mucho (60 artículos en 5.000 movimientos)
+      // es una referencia, no un identificador único: repetir es normal.
+      if (col.noVacios > col.cardinalidad * 3) continue
       const vistos = new Map<string, number>()
       let duplicados = 0
       for (const fila of sheet.rows) {

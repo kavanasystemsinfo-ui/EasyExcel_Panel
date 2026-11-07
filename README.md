@@ -71,7 +71,7 @@ la cadena es configurable por variables de entorno; por defecto:
 
 | Orden | Proveedor | Modelos |
 |---|---|---|
-| 1 | OpenRouter | `google/gemma-4-31b-it:free` → `cohere/north-mini-code:free` |
+| 1 | OpenRouter | `nvidia/nemotron-3.5-super-vl:free` → `nemotron-3-ultra` → `gemma-4-31b-it` → `north-mini-code` |
 | 2 | NVIDIA NIM (respaldo por cuota agotada en OpenRouter) | `google/gemma-4-31b-it` |
 
 - **Contexto anclado**: el frontend envía hoja, sección, filtros activos, KPIs,

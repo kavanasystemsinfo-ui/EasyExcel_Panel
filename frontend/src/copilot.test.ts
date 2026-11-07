@@ -84,3 +84,42 @@ describe('construirContexto', () => {
     expect(blob.length).toBeLessThan(60_000)
   })
 })
+
+describe('construirContexto: cifras sobre todas las filas', () => {
+  const filas = Array.from({ length: 100 }, (_, i) => [
+    i % 2 === 0 ? 'Norte' : 'Sur',
+    i % 4 === 0 ? 'Ana' : i % 4 === 1 ? 'Luis' : 'Eva',
+    '125.5',
+    '28045',
+    `2025-0${(i % 9) + 1}-10`,
+  ])
+  const ctx = construirContexto({
+    hoja: 'Ventas',
+    seccion: 'Datos',
+    filtros: [],
+    kpis: null,
+    alertas: [],
+    header: ['Zona', 'Comercial', 'Importe', 'Cód. postal', 'Fecha'],
+    filas,
+  })
+
+  it('suma toda la hoja, no solo la muestra', () => {
+    expect(ctx.total_filas).toBe(100)
+    expect(ctx.muestra.filas).toHaveLength(MAX_MUESTRA_FILAS)
+    expect(ctx.estadisticas['Importe']).toMatchObject({ n: 100, suma: 12550, media: 125.5 })
+  })
+
+  it('no calcula estadisticas de codigos postales', () => {
+    expect(ctx.estadisticas['Cód. postal']).toBeUndefined()
+  })
+
+  it('agrupa por categoria con la suma real', () => {
+    const cruce = ctx.cruces['Importe por Zona']
+    expect(cruce).toHaveLength(2)
+    expect(cruce[0].suma).toBe(6275)
+  })
+
+  it('da el rango de fechas', () => {
+    expect(ctx.rangos_fechas['Fecha']).toEqual(['2025-01-10', '2025-09-10'])
+  })
+})

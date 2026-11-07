@@ -94,15 +94,11 @@ def test_parser_tabla_en_c5(client):
     hoja = body["sheets"][0]
     # Debe detectar fila 5 como cabecera (las 1-4 son títulos de 1 celda)
     assert hoja["header_row"] == 5
-    # Cabecera normalizada: celdas A,B vacías -> "Columna 1", "Columna 2"
-    # Luego Producto, Unidades, Importe
-    assert hoja["header"][2] == "Producto"
-    assert hoja["header"][3] == "Unidades"
-    assert hoja["header"][4] == "Importe"
+    # Las columnas A y B no tienen cabecera ni datos: se descartan, no salen
+    # como "Columna 1" y "Columna 2".
+    assert hoja["header"] == ["Producto", "Unidades", "Importe"]
     assert hoja["rows"] == 2
-    assert hoja["data"][0][2] == "Sofa"
-    assert hoja["data"][0][3] == 3
-    assert hoja["data"][0][4] == 450.5
+    assert hoja["data"][0] == ["Sofa", 3, 450.5]
 
 
 # 3. Celdas combinadas (merged cells) - xlsx

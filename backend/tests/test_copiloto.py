@@ -94,6 +94,8 @@ def test_openrouter_agotado_cae_en_nvidia(
 ) -> None:
     ctx = _Ctx()
     original = _fake_stream("Rescatado")
+    # Dos modelos fijos: el test no debe depender de la lista por defecto.
+    monkeypatch.setattr(assistant.settings, "openrouter_models", "a:free,b:free")
 
     async def sel(
         prov: assistant.Proveedor,

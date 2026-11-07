@@ -267,6 +267,18 @@ def _construir_tabla(
         crudo = [_cell(v) for v in filas[0]]
         ancho = max(cols, _width(tuple(filas[0])))
         datos = filas[1:]
+    # Columnas sin cabecera y sin ningún dato (típico: tabla que empieza en C5):
+    # no aportan nada y salían como "Columna 1", "Columna 2".
+    def _llena(c: int) -> bool:
+        if c < len(crudo) and str(crudo[c] or "").strip():
+            return True
+        return any(c < len(r) and _cell(r[c]) not in ("", None) for r in datos)
+
+    conservar = [c for c in range(ancho) if _llena(c)]
+    if conservar and len(conservar) < ancho:
+        crudo = [crudo[c] if c < len(crudo) else "" for c in conservar]
+        datos = [[r[c] if c < len(r) else None for c in conservar] for r in datos]
+        ancho = cols = len(conservar)
     return {
         "header": _normalize_header(crudo, ancho),
         "data": datos,

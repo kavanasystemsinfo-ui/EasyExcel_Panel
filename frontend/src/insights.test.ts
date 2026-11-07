@@ -40,7 +40,12 @@ describe('esLibroDemo', () => {
   })
 
   it('reconoce el demo aunque falten algunas hojas', () => {
-    expect(esLibroDemo(['Empleados', 'Otra'])).toBe(true)
+    expect(esLibroDemo(['Empleados', 'Centros', 'Contratos', 'Otra'])).toBe(true)
+  })
+
+  it('un libro de RRHH con hojas Empleados y Vacaciones no es el demo', () => {
+    expect(esLibroDemo(['Plantilla', 'Vacaciones'])).toBe(false)
+    expect(esLibroDemo(['Empleados', 'Vacaciones'])).toBe(false)
   })
 
   it('un libro generico no es el demo', () => {
@@ -54,7 +59,7 @@ describe('esLibroDemo', () => {
 
 describe('seccionesDeLibro', () => {
   it('para el demo devuelve las 4 secciones del dominio', () => {
-    const ids = seccionesDeLibro(['Empleados', 'Centros']).map((s) => s.id)
+    const ids = seccionesDeLibro(['Empleados', 'Centros', 'Vacaciones']).map((s) => s.id)
     expect(ids).toEqual(['resumen', 'personal', 'operaciones', 'datos'])
   })
 
@@ -235,5 +240,73 @@ describe('sugerenciasCopiloto', () => {
   it('da como maximo 6 sugerencias', () => {
     const headerLargo = Array.from({ length: 20 }, (_, i) => `Col${i}`)
     expect(sugerenciasCopiloto(headerLargo, 'X').length).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('columnas que parecen numeros pero son codigos', () => {
+  const proveedores: SheetData = {
+    header: ['Articulo', 'Stock', 'Cód. postal prov.', 'Teléfono prov.', 'Año', 'Estado'],
+    rows: [
+      ['A', 10, '28045', '912345678', 2024, 'OK'],
+      ['B', 20, '46001', '963111222', 2025, 'OK'],
+      ['C', 30, '28045', '912345678', 2025, 'Bajo'],
+      ['D', 40, '48010', '944555666', 2024, 'OK'],
+    ],
+  }
+
+  it('no suma codigos postales, telefonos ni años', () => {
+    const kpis = inferirKpis({ Stock: proveedores })
+    const titulos = kpis.map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Stock')
+    expect(titulos.some((t) => /postal|tel[eé]fono|a[nñ]o/i.test(t))).toBe(false)
+  })
+
+  it('no avisa de duplicados en telefonos ni codigos postales', () => {
+    const alertas = alertasGenericas({ Stock: proveedores })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(false)
+  })
+
+  it('no suma una columna de digitos con ceros a la izquierda', () => {
+    const hoja: SheetData = {
+      header: ['Cliente', 'Zona', 'Importe'],
+      rows: [
+        ['A', '01234', 10],
+        ['B', '05678', 20],
+        ['C', '01234', 30],
+      ],
+    }
+    const titulos = inferirKpis({ H: hoja }).map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Importe')
+    expect(titulos).not.toContain('Suma de Zona')
+  })
+})
+
+describe('cabeceras de dos niveles', () => {
+  it('no suma "Empleado · Nº" ni "Contacto · Teléfono"', () => {
+    const hoja: SheetData = {
+      header: ['Empleado · Nº', 'Empleado · Nombre', 'Retribución · Salario', 'Contacto · Teléfono'],
+      rows: [
+        [1001, 'Ana', 21500, 912345678],
+        [1002, 'Luis', 24000, 963111222],
+        [1003, 'Eva', 27500, 944555666],
+      ],
+    }
+    const titulos = inferirKpis({ Plantilla: hoja }).map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Retribución · Salario')
+    expect(titulos.some((t) => /Nº|Teléfono/.test(t))).toBe(false)
+  })
+})
+
+describe('alertas de duplicados', () => {
+  it('no avisa cuando el codigo es una referencia que se repite (movimientos)', () => {
+    const rows = Array.from({ length: 100 }, (_, i) => [`ART-${i % 5}`, 'Entrada', i])
+    const alertas = alertasGenericas({ Mov: { header: ['Código', 'Tipo', 'Cantidad'], rows } })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(false)
+  })
+
+  it('sigue avisando de un id casi unico con un duplicado', () => {
+    const rows = Array.from({ length: 20 }, (_, i) => [i === 19 ? 1 : i + 1, 'x'])
+    const alertas = alertasGenericas({ H: { header: ['ID', 'Nombre'], rows } })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(true)
   })
 })

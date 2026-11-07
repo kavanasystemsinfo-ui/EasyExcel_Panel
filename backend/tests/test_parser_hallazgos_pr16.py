@@ -311,3 +311,20 @@ def test_h03_target_fuera_de_xl_se_ignora(tmp_path):
                 datos = datos.replace(b"worksheets/sheet1.xml", b"../../x.xml")
             salida.writestr(item, datos)
     assert _xlsx_combinadas(str(malo), "S") == []
+
+
+def test_columnas_vacias_a_la_izquierda_se_descartan(tmp_path):
+    """Tabla que empieza en C5: no deben salir 'Columna 1' y 'Columna 2' vacías."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Stock"
+    for i, c in enumerate(["Código", "Stock", "Estado"], start=3):
+        ws.cell(row=5, column=i, value=c)
+    for r in range(6, 12):
+        ws.cell(row=r, column=3, value=f"ART-{r}")
+        ws.cell(row=r, column=4, value=r * 10)
+        ws.cell(row=r, column=5, value="OK")
+    meta, datos = _leer(_guardar(wb, tmp_path), "Stock")
+    assert datos["header"] == ["Código", "Stock", "Estado"]
+    assert meta["cols"] == 3
+    assert datos["rows"][0] == ["ART-6", 60, "OK"]

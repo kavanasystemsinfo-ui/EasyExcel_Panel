@@ -18,7 +18,7 @@ flowchart LR
     end
 
     subgraph externos["Modelos gratuitos"]
-        OR["OpenRouter<br/>gemma-4-31b-it:free → north-mini-code:free"]
+        OR["OpenRouter<br/>nemotron-3.5-super-vl:free → nemotron-3-ultra → gemma-4-31b-it → north-mini-code"]
         NV["NVIDIA NIM<br/>gemma-4-31b-it"]
     end
 
