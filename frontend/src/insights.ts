@@ -24,7 +24,7 @@ export function seccionesDeLibro(nombres: string[]): { id: Seccion; nombre: stri
   ]
 }
 
-type ColInfo = {
+export type ColInfo = {
   nombre: string
   idx: number
   tipo: 'numerica' | 'fecha' | 'categorica' | 'id' | 'codigo' | 'texto'
@@ -45,7 +45,7 @@ function pareceCodigo(valores: unknown[]): boolean {
   return largo >= 5 && textos.every((t) => t.length === largo)
 }
 
-function analizarColumnas(sheet: SheetData): ColInfo[] {
+export function analizarColumnas(sheet: SheetData): ColInfo[] {
   const total = sheet.rows.length
   return sheet.header.map((nombre, idx) => {
     let noVacios = 0
