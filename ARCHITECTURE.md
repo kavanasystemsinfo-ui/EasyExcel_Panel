@@ -14,7 +14,7 @@ flowchart LR
     subgraph render["Render"]
         FE["easyexcel-frontend<br/>estático (dist/) + proxy /api/*"]
         BE["easyexcel-backend<br/>FastAPI + Uvicorn"]
-        DISCO[("Disco persistente<br/>/var/data/uploads<br/>workbooks + manifest JSON")]
+        DISCO[("Disco efímero (plan gratuito)<br/>/tmp/easyexcel-uploads<br/>workbooks + manifest JSON")]
     end
 
     subgraph externos["Modelos gratuitos"]
@@ -47,7 +47,7 @@ flowchart LR
 2. FastAPI valida la entrada con Pydantic y despacha por routers:
    `workbooks` (carga, listado, detalle, filas, export, demo, borrado),
    `copiloto` (SSE) y `health`.
-3. Los Excel viven en el disco persistente (`/var/data/uploads`): cada libro
+3. Los Excel viven en disco efímero (`/tmp/easyexcel-uploads`, plan gratuito; se vacía al reiniciar): cada libro
    es un `.xlsx` + un `manifest.json` con su metadato (ADR-0002). Las subidas
    caducan a las 2 h y se purgan en cada operación (ADR-0004).
 4. El parseo ocurre en un subproceso con timeout y límites (10 MB, 50 hojas,
@@ -93,7 +93,7 @@ frontend/src/
 ## Despliegue
 
 - **Backend** `easyexcel-backend.onrender.com`: Python 3.14, `uvicorn app.main:app`,
-  health check en `/health`, disco de 1 GB montado en `/var/data`, despliegue
+  health check en `/health`, plan gratuito sin disco persistente, despliegue
   automático al hacer push a `main`.
 - **Frontend** `easyexcel-frontend.onrender.com` (dominio propio
   `easyexcel.kavanasystems.com`): build estático de Vite con proxy `/api/*`.
