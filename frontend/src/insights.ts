@@ -27,10 +27,22 @@ export function seccionesDeLibro(nombres: string[]): { id: Seccion; nombre: stri
 type ColInfo = {
   nombre: string
   idx: number
-  tipo: 'numerica' | 'fecha' | 'categorica' | 'id' | 'texto'
+  tipo: 'numerica' | 'fecha' | 'categorica' | 'id' | 'codigo' | 'texto'
   cardinalidad: number
   noVacios: number
   vacios: number
+}
+
+// Columnas que llevan digitos pero no son cantidades: no se suman ni se promedian.
+const RE_NOMBRE_CODIGO =
+  /(postal|zip|telefono|tfno|tlf|movil|celular|phone|fax|iban|matricula|isbn|\b(cp|dni|nif|cif|nie|ean)\b|^n[º°o]\.?$|^(ano|anio|year|ejercicio)$)/
+
+function pareceCodigo(valores: unknown[]): boolean {
+  const textos = valores.map((v) => String(v ?? '').trim()).filter(Boolean)
+  if (textos.length < 2 || !textos.every((t) => /^\d+$/.test(t))) return false
+  if (textos.some((t) => t.length > 1 && t.startsWith('0'))) return true
+  const largo = textos[0].length
+  return largo >= 5 && textos.every((t) => t.length === largo)
 }
 
 function analizarColumnas(sheet: SheetData): ColInfo[] {
@@ -54,6 +66,7 @@ function analizarColumnas(sheet: SheetData): ColInfo[] {
     let tipo: ColInfo['tipo'] = 'texto'
     const esIdNombre = /^(id|sku|codigo|código|ref|referencia)/i.test(nombre.trim())
     if (noVacios === 0) tipo = 'texto'
+    else if (RE_NOMBRE_CODIGO.test(norm(nombre)) || pareceCodigo(sheet.rows.map((f) => f[idx]))) tipo = 'codigo'
     else if (esIdNombre) tipo = 'id'
     else if (nums / noVacios >= 0.8) tipo = 'numerica'
     else if (fechas / noVacios >= 0.8) tipo = 'fecha'

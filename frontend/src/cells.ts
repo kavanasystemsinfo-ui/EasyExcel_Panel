@@ -8,15 +8,38 @@ export function norm(value: unknown): string {
     .trim()
 }
 
+// Lee un numero escrito como texto, venga como venga: "21.500,00", "125.5",
+// "1,234.56", "1 250,5", "1.250 €". Con un solo separador y ambiguo ("1.234")
+// se asume formato espanol (miles), salvo que lo descarte (ceros a la izquierda
+// o distinta longitud de grupo: "125.5", "0.750", "3.1416").
 export function num(value: unknown): number {
   if (typeof value === 'number') return value
-  if (typeof value === 'string') {
-    const limpio = value.replace(/\./g, '').replace(',', '.').trim()
-    if (!limpio) return NaN
-    const n = Number(limpio)
-    return Number.isFinite(n) ? n : NaN
+  if (typeof value !== 'string') return NaN
+  const t = value.replace(/[\s€$£%]/g, '')
+  if (!/^[-+]?[\d.,]*\d[\d.,]*$/.test(t)) return NaN
+  const signo = t.startsWith('-') ? -1 : 1
+  const cuerpo = t.replace(/^[-+]/, '')
+  const puntos = (cuerpo.match(/\./g) ?? []).length
+  const comas = (cuerpo.match(/,/g) ?? []).length
+  let limpio: string
+  if (puntos && comas) {
+    const decimal = cuerpo.lastIndexOf('.') > cuerpo.lastIndexOf(',') ? '.' : ','
+    const miles = decimal === '.' ? ',' : '.'
+    if (cuerpo.split(decimal).length > 2) return NaN
+    limpio = cuerpo.split(miles).join('').replace(decimal, '.')
+  } else if (comas) {
+    limpio = comas === 1 ? cuerpo.replace(',', '.') : cuerpo.split(',').join('')
+  } else if (puntos > 1) {
+    limpio = cuerpo.split('.').join('')
+  } else if (puntos === 1) {
+    const [ent, dec] = cuerpo.split('.')
+    const esMiles = dec.length === 3 && ent.length >= 1 && ent.length <= 3 && !ent.startsWith('0')
+    limpio = esMiles ? ent + dec : cuerpo
+  } else {
+    limpio = cuerpo
   }
-  return NaN
+  const n = Number(limpio)
+  return Number.isFinite(n) ? signo * n : NaN
 }
 
 export function parseFecha(value: unknown): Date | null {

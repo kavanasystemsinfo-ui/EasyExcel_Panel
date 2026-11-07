@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatFecha, formatMoneda, tonoEstado } from './cells'
+import { formatFecha, formatMoneda, num, tonoEstado } from './cells'
 
 describe('formatMoneda', () => {
   it('formatea euros en es-ES', () => {
@@ -40,5 +40,33 @@ describe('tonoEstado', () => {
     expect(tonoEstado('Baja Médica')).toBe('danger')
     expect(tonoEstado('No Conforme')).toBe('danger')
     expect(tonoEstado('Desconocido')).toBe('neutral')
+  })
+})
+
+describe('num', () => {
+  it.each([
+    ['21.500,00', 21500],
+    ['125.5', 125.5],
+    ['125,5', 125.5],
+    ['0.75', 0.75],
+    ['12.50', 12.5],
+    ['3.1416', 3.1416],
+    ['1.234.567', 1234567],
+    ['1.234.567,89', 1234567.89],
+    ['1,234,567.89', 1234567.89],
+    ['21.500', 21500],
+    ['1 250,5', 1250.5],
+    ['-45,3', -45.3],
+    ['1.250 €', 1250],
+    ['$ 99.95', 99.95],
+  ])('lee %s como %d', (texto, esperado) => {
+    expect(num(texto)).toBe(esperado)
+  })
+
+  it('devuelve NaN para texto que no es numero', () => {
+    expect(Number.isNaN(num('n/a'))).toBe(true)
+    expect(Number.isNaN(num(''))).toBe(true)
+    expect(Number.isNaN(num('12abc'))).toBe(true)
+    expect(Number.isNaN(num('1.2.3.4x'))).toBe(true)
   })
 })

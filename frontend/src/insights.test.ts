@@ -237,3 +237,41 @@ describe('sugerenciasCopiloto', () => {
     expect(sugerenciasCopiloto(headerLargo, 'X').length).toBeLessThanOrEqual(6)
   })
 })
+
+describe('columnas que parecen numeros pero son codigos', () => {
+  const proveedores: SheetData = {
+    header: ['Articulo', 'Stock', 'Cód. postal prov.', 'Teléfono prov.', 'Año', 'Estado'],
+    rows: [
+      ['A', 10, '28045', '912345678', 2024, 'OK'],
+      ['B', 20, '46001', '963111222', 2025, 'OK'],
+      ['C', 30, '28045', '912345678', 2025, 'Bajo'],
+      ['D', 40, '48010', '944555666', 2024, 'OK'],
+    ],
+  }
+
+  it('no suma codigos postales, telefonos ni años', () => {
+    const kpis = inferirKpis({ Stock: proveedores })
+    const titulos = kpis.map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Stock')
+    expect(titulos.some((t) => /postal|tel[eé]fono|a[nñ]o/i.test(t))).toBe(false)
+  })
+
+  it('no avisa de duplicados en telefonos ni codigos postales', () => {
+    const alertas = alertasGenericas({ Stock: proveedores })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(false)
+  })
+
+  it('no suma una columna de digitos con ceros a la izquierda', () => {
+    const hoja: SheetData = {
+      header: ['Cliente', 'Zona', 'Importe'],
+      rows: [
+        ['A', '01234', 10],
+        ['B', '05678', 20],
+        ['C', '01234', 30],
+      ],
+    }
+    const titulos = inferirKpis({ H: hoja }).map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Importe')
+    expect(titulos).not.toContain('Suma de Zona')
+  })
+})
