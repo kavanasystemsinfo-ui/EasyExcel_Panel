@@ -245,6 +245,9 @@ export function alertasGenericas(data: Record<string, SheetData>): Alerta[] {
 
     const idCols = cols.filter((c) => c.tipo === 'id')
     for (const col of idCols) {
+      // Una columna "Código" que se repite mucho (60 artículos en 5.000 movimientos)
+      // es una referencia, no un identificador único: repetir es normal.
+      if (col.cardinalidad < col.noVacios * 0.9) continue
       const vistos = new Map<string, number>()
       let duplicados = 0
       for (const fila of sheet.rows) {

@@ -296,3 +296,17 @@ describe('cabeceras de dos niveles', () => {
     expect(titulos.some((t) => /Nº|Teléfono/.test(t))).toBe(false)
   })
 })
+
+describe('alertas de duplicados', () => {
+  it('no avisa cuando el codigo es una referencia que se repite (movimientos)', () => {
+    const rows = Array.from({ length: 100 }, (_, i) => [`ART-${i % 5}`, 'Entrada', i])
+    const alertas = alertasGenericas({ Mov: { header: ['Código', 'Tipo', 'Cantidad'], rows } })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(false)
+  })
+
+  it('sigue avisando de un id casi unico con un duplicado', () => {
+    const rows = Array.from({ length: 20 }, (_, i) => [i === 19 ? 1 : i + 1, 'x'])
+    const alertas = alertasGenericas({ H: { header: ['ID', 'Nombre'], rows } })
+    expect(alertas.some((a) => /duplicad/i.test(a.texto))).toBe(true)
+  })
+})
