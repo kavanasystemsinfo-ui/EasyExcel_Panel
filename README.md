@@ -281,7 +281,7 @@ Documentación transversal: [ARCHITECTURE.md](ARCHITECTURE.md) (diagrama y lími
      avisa de que son modelos gratuitos para datos demo sin información
      personal real
 7. **Fase 7** — Despliegue en producción ✅
-   - Render (backend con disco persistente + frontend estático con proxy
+   - Render (backend en plan gratuito con disco efímero + frontend estático con proxy
      `/api`), dominio propio `easyexcel.kavanasystems.com`, CI en verde y
      auditoría de seguridad y documentación (22/10/2026)
 8. **Fase 8** — Autenticación y multiusuario (pendiente; JWT + RLS cuando
