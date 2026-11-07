@@ -40,7 +40,12 @@ describe('esLibroDemo', () => {
   })
 
   it('reconoce el demo aunque falten algunas hojas', () => {
-    expect(esLibroDemo(['Empleados', 'Otra'])).toBe(true)
+    expect(esLibroDemo(['Empleados', 'Centros', 'Contratos', 'Otra'])).toBe(true)
+  })
+
+  it('un libro de RRHH con hojas Empleados y Vacaciones no es el demo', () => {
+    expect(esLibroDemo(['Plantilla', 'Vacaciones'])).toBe(false)
+    expect(esLibroDemo(['Empleados', 'Vacaciones'])).toBe(false)
   })
 
   it('un libro generico no es el demo', () => {
@@ -54,7 +59,7 @@ describe('esLibroDemo', () => {
 
 describe('seccionesDeLibro', () => {
   it('para el demo devuelve las 4 secciones del dominio', () => {
-    const ids = seccionesDeLibro(['Empleados', 'Centros']).map((s) => s.id)
+    const ids = seccionesDeLibro(['Empleados', 'Centros', 'Vacaciones']).map((s) => s.id)
     expect(ids).toEqual(['resumen', 'personal', 'operaciones', 'datos'])
   })
 

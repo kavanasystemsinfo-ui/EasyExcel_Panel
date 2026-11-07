@@ -6,7 +6,9 @@ import type { Alerta, Seccion } from './views'
 const HOJAS_DEMO = ['Empleados', 'Centros', 'Vacaciones', 'Contratos', 'Auditorias', 'Maquinaria']
 
 export function esLibroDemo(nombres: string[]): boolean {
-  return nombres.some((n) => HOJAS_DEMO.includes(n))
+  // Hace falta que coincidan varias hojas: 'Empleados' o 'Vacaciones' solas
+  // las tiene cualquier empresa y no convierten su libro en el demo.
+  return nombres.filter((n) => HOJAS_DEMO.includes(n)).length >= 3
 }
 
 export function seccionesDeLibro(nombres: string[]): { id: Seccion; nombre: string; icono: string }[] {
