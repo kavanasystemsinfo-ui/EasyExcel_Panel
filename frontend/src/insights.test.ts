@@ -280,3 +280,19 @@ describe('columnas que parecen numeros pero son codigos', () => {
     expect(titulos).not.toContain('Suma de Zona')
   })
 })
+
+describe('cabeceras de dos niveles', () => {
+  it('no suma "Empleado · Nº" ni "Contacto · Teléfono"', () => {
+    const hoja: SheetData = {
+      header: ['Empleado · Nº', 'Empleado · Nombre', 'Retribución · Salario', 'Contacto · Teléfono'],
+      rows: [
+        [1001, 'Ana', 21500, 912345678],
+        [1002, 'Luis', 24000, 963111222],
+        [1003, 'Eva', 27500, 944555666],
+      ],
+    }
+    const titulos = inferirKpis({ Plantilla: hoja }).map((k) => k.titulo)
+    expect(titulos).toContain('Suma de Retribución · Salario')
+    expect(titulos.some((t) => /Nº|Teléfono/.test(t))).toBe(false)
+  })
+})

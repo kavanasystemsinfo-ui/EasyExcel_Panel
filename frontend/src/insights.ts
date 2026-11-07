@@ -40,11 +40,14 @@ const RE_NOMBRE_CODIGO =
   /(postal|zip|telefono|tfno|tlf|movil|celular|phone|fax|iban|matricula|isbn|\b(cp|dni|nif|cif|nie|ean)\b|^n[º°o]\.?$|^(ano|anio|year|ejercicio)$)/
 
 function pareceCodigo(valores: unknown[]): boolean {
-  const textos = valores.map((v) => String(v ?? '').trim()).filter(Boolean)
+  const llenos = valores.filter((v) => String(v ?? '').trim() !== '')
+  const textos = llenos.map((v) => String(v).trim())
   if (textos.length < 2 || !textos.every((t) => /^\d+$/.test(t))) return false
   if (textos.some((t) => t.length > 1 && t.startsWith('0'))) return true
+  // Dígitos guardados como texto y todos de la misma longitud: código, no cantidad.
+  // Un número real de 5 cifras (21500) sí es una cantidad.
   const largo = textos[0].length
-  return largo >= 5 && textos.every((t) => t.length === largo)
+  return largo >= 5 && llenos.every((v) => typeof v === 'string') && textos.every((t) => t.length === largo)
 }
 
 export function analizarColumnas(sheet: SheetData): ColInfo[] {
@@ -66,9 +69,11 @@ export function analizarColumnas(sheet: SheetData): ColInfo[] {
     const vacios = total - noVacios
     const cardinalidad = distintos.size
     let tipo: ColInfo['tipo'] = 'texto'
-    const esIdNombre = /^(id|sku|codigo|código|ref|referencia)/i.test(nombre.trim())
+    // En cabeceras de dos niveles ("Empleado · Nº") manda el nombre de la subcolumna.
+    const base = nombre.split(' · ').pop() ?? nombre
+    const esIdNombre = /^(id|sku|codigo|código|ref|referencia)/i.test(base.trim())
     if (noVacios === 0) tipo = 'texto'
-    else if (RE_NOMBRE_CODIGO.test(norm(nombre)) || pareceCodigo(sheet.rows.map((f) => f[idx]))) tipo = 'codigo'
+    else if (RE_NOMBRE_CODIGO.test(norm(base)) || pareceCodigo(sheet.rows.map((f) => f[idx]))) tipo = 'codigo'
     else if (esIdNombre) tipo = 'id'
     else if (nums / noVacios >= 0.8) tipo = 'numerica'
     else if (fechas / noVacios >= 0.8) tipo = 'fecha'
