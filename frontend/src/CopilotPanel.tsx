@@ -121,10 +121,16 @@ function CopilotPanel({
               <input
                 type="checkbox"
                 checked={incluirFilas}
+                aria-describedby="copilot-privacidad-nota"
                 onChange={(event) => onIncluirFilas(event.target.checked)}
               />{' '}
               Incluir filas de ejemplo (se envían a un proveedor de IA externo)
             </label>
+          ) : null}
+          {!esDemo && onIncluirFilas ? (
+            <small id="copilot-privacidad-nota" className="copilot-privacidad-nota">
+              Sin marcar solo se envían resúmenes (recuentos y estadísticas), nunca filas
+            </small>
           ) : null}
 
           <p className="copilot-chips">
