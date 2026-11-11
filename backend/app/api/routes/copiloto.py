@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.ai import assistant
 from app.api.schemas import CopilotoPayload
+from app.core.ratelimit import ip_real
 
 router = APIRouter(tags=["copiloto"])
 
@@ -24,14 +25,7 @@ async def copiloto(payload: CopilotoPayload, request: Request) -> Any:
             status_code=503,
         )
 
-    # Detras del proxy de Render request.client.host es la IP del propio
-    # proxy: sin X-Forwarded-For todos los usuarios compartiran un solo cubo.
-    # La IP real la añade el proxy al FINAL de la cadena: la primera
-    # posición la controla el cliente y se ignora para no permitir spoofing.
-    xff = request.headers.get("x-forwarded-for", "")
-    ip = xff.split(",")[-1].strip() if xff else (
-        request.client.host if request.client else "anonimo"
-    )
+    ip = ip_real(request)
     try:
         assistant.comprobar_rate(ip)
     except assistant.RateLimitError as exc:

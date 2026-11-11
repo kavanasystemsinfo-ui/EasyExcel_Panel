@@ -25,7 +25,7 @@ sincronizado con los .xlsx que la empresa ya usa.
 | Demo en vivo en producción (Render + dominio propio) | **DESPLEGADO** (<https://easyexcel.kavanasystems.com>) |
 | Dataset demo del servidor (9 hojas de negocio + Info, semilla fija, planta cerámica) | **VERIFICADO** (tests de sector, ADR-0008) |
 | API: 9 endpoints (7 de workbooks + `/health` + copiloto) | **VERIFICADO** (76 tests pytest + smoke con el dataset real) |
-| Parsing multi-formato (.xlsx/.xls/.ods/.csv) aislado en subproceso con timeout y límites | **VERIFICADO** (ADR-0005) |
+| Parsing multi-formato (.xlsx/.xls/.ods/.csv) en subproceso aislado (spawn) con timeout y límite de memoria, y comprobación de zip | **VERIFICADO** (ADR-0005) |
 | Subidas efímeras con caducidad de 2 h | **VERIFICADO** (ADR-0004, tests de purga) |
 | UI: dashboard operativo (sidebar, topbar, banner, grid paginado con badges) | **VERIFICADO** (suite frontend: 197 tests Vitest) |
 | Navegación por 4 vistas (Resumen, Personal, Operaciones, Datos) con KPIs, gráficos y hojas por dominio | **VERIFICADO** (tests de `views.ts` + E2E de navegación) |
@@ -109,8 +109,8 @@ Cualquiera con el enlace puede verlo y descargarlo como `.xlsx`; nadie puede edi
 |---|---|
 | Upload | 10 MB leídos en bloques de 1 MB (413 al primer bloque que desborda), validación extensión + magic bytes, **30 subidas/hora por IP** (429 antes de leer el body) |
 | Estructura del libro | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export |
-| Parseo | subproceso con timeout, nunca en el hilo de la petición |
-| Caducidad | los Excel subidos caducan a las 2 h y se purgan en cada operación (el demo no caduca) |
+| Parseo | subproceso aislado (spawn) con timeout y límite de memoria, y comprobación de zip; nunca en el hilo de la petición |
+| Caducidad | los Excel subidos caducan a las 2 h y se purgan cada 10 minutos y al subir (el demo no caduca) |
 | Copiloto | 20/día por IP, caché 200, sin claves → 503 |
 | HTML del copiloto | todo el texto del modelo se escapa antes del markdown (`frontend/src/copilotoRender.ts`) |
 | CORS | en producción todo es mismo origen vía proxy `/api`; allowlist explícita en dev |
@@ -210,7 +210,7 @@ backend/   FastAPI + Pydantic (app/), tests/ (pytest)
   app/ai/        cadena de proveedores del copiloto, rate limit y caché
   app/core/      configuración, storage (FS + manifest), rate limit por IP y
                  generador del demo
-  app/domain/    excel_parser (multi-formato, subproceso con timeout)
+  app/domain/    excel_parser (multi-formato, subproceso aislado con timeout y límite de memoria)
    tests/         pytest (76 tests)
 frontend/  React + TypeScript con Vite (src/, tests con Vitest, 197 tests)
   src/edit.ts         motor de edición de hojas (puro, con límites)
@@ -296,6 +296,15 @@ direcciones y empresas ficticios). No contienen datos reales de ninguna persona 
 ninguna compañía. Los dominios usados (`ceramicaturia.es`, `empresa-limpieza.es`,
 `demo.easyexcel.local`) son inventados. La demo no exige registro y no almacena nada del visitante más allá de
 su sesión local en el navegador.
+
+## Camino a producción
+
+- Autenticación y organizaciones con permisos por libro.
+- PostgreSQL más almacenamiento de objetos en lugar de /tmp.
+- Cola de trabajos para el parseo.
+- Contadores de abuso en Redis si hay varias instancias.
+- Historial de cambios por usuario.
+- IA desactivable por organización, con campos permitidos y proveedor con acuerdo de retención.
 
 ## Licencia
 

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     max_rows_per_sheet: int = 100_000
     max_export_cells: int = 2_000_000
     parse_timeout_s: float = 30.0
+    parse_total_timeout_s: float = 90.0
     parse_mem_mb: int = 300
     max_unzipped_mb: int = 200
     upload_dir: Path = UPLOAD_BASE
