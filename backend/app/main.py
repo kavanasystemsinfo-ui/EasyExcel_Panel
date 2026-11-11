@@ -10,6 +10,7 @@ from app.api.routes import copiloto, health, workbooks
 from app.core.config import settings
 from app.core.ratelimit import LimiteExcedido
 from app.errors import (
+    ForbiddenError,
     InvalidWorkbookError,
     WorkbookLimitError,
     WorkbookNotFoundError,
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(InvalidWorkbookError, handler(400))
     app.add_exception_handler(WorkbookTooLargeError, handler(413))
     app.add_exception_handler(WorkbookNotFoundError, handler(404))
+    app.add_exception_handler(ForbiddenError, handler(403))
     app.add_exception_handler(WorkbookLimitError, handler(422))
     app.add_exception_handler(WorkbookParseTimeoutError, handler(422))
     app.add_exception_handler(LimiteExcedido, handler(429))

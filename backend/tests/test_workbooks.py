@@ -144,11 +144,10 @@ def test_carga_rechaza_hojas_vacias_del_todo(client):
 # ------------------------------------------------------------- inventario
 
 
-def test_lista_incluye_lo_subido(client, xlsx_2_hojas):
+def test_lista_workbooks_eliminada(client, xlsx_2_hojas):
     upload(client, xlsx_2_hojas)
     resp = client.get("/api/v1/workbooks")
-    assert resp.status_code == 200
-    assert len(resp.json()) == 1
+    assert resp.status_code in (404, 405)
 
 
 def test_detalle_y_404(client, xlsx_2_hojas):
@@ -197,9 +196,38 @@ def test_filas_hoja_inexistente_404(client, xlsx_2_hojas):
 # ------------------------------------------------------------------ borrado
 
 
-def test_borrado(client, xlsx_2_hojas):
-    wb_id = upload(client, xlsx_2_hojas).json()["id"]
-    assert client.delete(f"/api/v1/workbooks/{wb_id}").status_code == 204
+def test_borrado_con_token_propietario(client, xlsx_2_hojas):
+    resp_upload = upload(client, xlsx_2_hojas)
+    assert resp_upload.status_code == 201
+    wb_id = resp_upload.json()["id"]
+    owner_token = resp_upload.json()["owner_token"]
+
+    # El hash NO debe salir en GET /{id}
+    resp_get = client.get(f"/api/v1/workbooks/{wb_id}")
+    assert resp_get.status_code == 200
+    assert "owner_token_sha256" not in resp_get.json()
+
+    # DELETE sin token → 403
+    resp_del_sin = client.delete(f"/api/v1/workbooks/{wb_id}")
+    assert resp_del_sin.status_code == 403
+    assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 200
+
+    # DELETE con token de otro libro → 403
+    otro_resp = upload(client, xlsx_2_hojas)
+    otro_token = otro_resp.json()["owner_token"]
+    resp_del_otro = client.delete(
+        f"/api/v1/workbooks/{wb_id}",
+        headers={"X-Owner-Token": otro_token},
+    )
+    assert resp_del_otro.status_code == 403
+    assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 200
+
+    # DELETE con su token → 204
+    resp_del_propio = client.delete(
+        f"/api/v1/workbooks/{wb_id}",
+        headers={"X-Owner-Token": owner_token},
+    )
+    assert resp_del_propio.status_code == 204
     assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 404
     assert client.delete(f"/api/v1/workbooks/{wb_id}").status_code == 404
 
@@ -223,10 +251,9 @@ def test_purga_elimina_subidas_expiradas(client, xlsx_2_hojas, tmp_path):
     wb_id = upload(client, xlsx_2_hojas).json()["id"]
     _envejecer(tmp_path, wb_id, horas=3)
 
-    resp = client.get("/api/v1/workbooks")
+    resp = client.get(f"/api/v1/workbooks/{wb_id}")
 
-    assert resp.status_code == 200
-    assert resp.json() == []
+    assert resp.status_code == 404
     assert not (tmp_path / wb_id).exists()
 
 
@@ -234,9 +261,10 @@ def test_purga_conserva_lo_dentro_del_ttl(client, xlsx_2_hojas, tmp_path):
     wb_id = upload(client, xlsx_2_hojas).json()["id"]
     _envejecer(tmp_path, wb_id, horas=1)
 
-    resp = client.get("/api/v1/workbooks")
+    resp = client.get(f"/api/v1/workbooks/{wb_id}")
 
-    assert [w["id"] for w in resp.json()] == [wb_id]
+    assert resp.status_code == 200
+    assert resp.json()["id"] == wb_id
     assert (tmp_path / wb_id).is_dir()
 
 
@@ -244,7 +272,7 @@ def test_purga_no_toca_el_demo(client, tmp_path):
     demo_id = client.get("/api/v1/workbooks/demo").json()["id"]
     _envejecer(tmp_path, demo_id, horas=48)
 
-    client.get("/api/v1/workbooks")  # dispara la purga
+    client.get("/api/v1/workbooks/demo")  # dispara la purga
 
     assert (tmp_path / demo_id).is_dir()
     assert client.get("/api/v1/workbooks/demo").status_code == 200
@@ -259,8 +287,9 @@ def test_upload_dispara_purga(client, xlsx_2_hojas, tmp_path):
 
     assert not (tmp_path / viejo).exists()
     assert (tmp_path / nuevo).is_dir()
-    ids = [w["id"] for w in client.get("/api/v1/workbooks").json()]
-    assert ids == [nuevo]
+    resp = client.get(f"/api/v1/workbooks/{nuevo}")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == nuevo
 
 
 def test_export_libro_expirado_404(client, xlsx_2_hojas, tmp_path):
@@ -281,8 +310,8 @@ def test_ttl_configurable_por_env(client, xlsx_2_hojas, tmp_path, monkeypatch):
     wb_id = upload(client, xlsx_2_hojas).json()["id"]
     _envejecer(tmp_path, wb_id, horas=1.5)
 
-    assert client.get("/api/v1/workbooks").json() == []
-    assert client.get(f"/api/v1/workbooks/{wb_id}").status_code == 404
+    resp = client.get(f"/api/v1/workbooks/{wb_id}")
+    assert resp.status_code == 404
 
 
 def test_arrancar_el_demo_tambien_purga(client, xlsx_2_hojas, tmp_path):
@@ -421,5 +450,4 @@ def test_upload_rate_limit_no_toca_las_lecturas(client, xlsx_2_hojas, monkeypatc
     monkeypatch.setattr(settings, "upload_rate_limit", 1)
     assert upload(client, xlsx_2_hojas).status_code == 201
     assert upload(client, xlsx_2_hojas).status_code == 429
-    assert client.get("/api/v1/workbooks").status_code == 200
     assert client.get("/api/v1/workbooks/demo").status_code == 200

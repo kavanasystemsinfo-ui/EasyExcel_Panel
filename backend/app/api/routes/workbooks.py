@@ -1,4 +1,6 @@
+import hashlib
 import re
+import secrets
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -12,11 +14,12 @@ from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
 
 from ...errors import (
+    ForbiddenError,
     InvalidWorkbookError,
     WorkbookNotFoundError,
     WorkbookTooLargeError,
 )
-from ..schemas import ExportPayload, SheetRows, WorkbookListItem, WorkbookOut
+from ..schemas import ExportPayload, SheetRows, WorkbookOut
 
 router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 
@@ -132,14 +135,15 @@ async def upload_workbook(
     except Exception:
         storage.delete(workbook_id)
         raise
-    manifest = storage.finalize(workbook_id, filename, sheets_meta)
-    return {**manifest, "sheets": sheets_full}
-
-
-@router.get("", response_model=list[WorkbookListItem])
-def list_workbooks() -> list[dict]:
-    _purge()
-    return _storage().list()
+    owner_token = secrets.token_urlsafe(32)
+    owner_token_sha256 = hashlib.sha256(owner_token.encode()).hexdigest()
+    manifest = storage.finalize(
+        workbook_id,
+        filename,
+        sheets_meta,
+        extra={"owner_token_sha256": owner_token_sha256},
+    )
+    return {**manifest, "sheets": sheets_full, "owner_token": owner_token}
 
 
 @router.get("/demo", response_model=WorkbookOut)
@@ -202,8 +206,29 @@ def export_sheet(
 
 
 @router.delete("/{workbook_id}", status_code=204)
-def delete_workbook(workbook_id: str) -> None:
+def delete_workbook(
+    workbook_id: str,
+    request: Request,
+) -> None:
+    # Primero comprobamos existencia: 404 si no existe
+    manifest = _get_manifest(workbook_id)
+
+    # Demo nunca se borra
     if workbook_id in {DEMO_ALIAS, DEMO_ID}:
         raise InvalidWorkbookError("El libro demo es de solo lectura")
+
+    owner_token = request.headers.get("X-Owner-Token")
+    if not owner_token:
+        raise ForbiddenError("Falta la cabecera X-Owner-Token")
+
+    stored_hash = manifest.get("owner_token_sha256")
+    if not stored_hash:
+        raise ForbiddenError("El libro no tiene token de propietario")
+
+    import hmac
+
+    if not hmac.compare_digest(stored_hash, hashlib.sha256(owner_token.encode()).hexdigest()):
+        raise ForbiddenError("Token de propietario inválido")
+
     if not _storage().delete(workbook_id):
         raise WorkbookNotFoundError(f"El libro '{workbook_id}' no existe")

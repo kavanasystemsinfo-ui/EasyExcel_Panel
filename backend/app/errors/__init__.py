@@ -21,3 +21,7 @@ class WorkbookParseTimeoutError(WorkbookError):
 
 class WorkbookNotFoundError(WorkbookError):
     """El libro o la hoja solicitada no existe."""
+
+
+class ForbiddenError(WorkbookError):
+    """Token de propietario inválido o ausente."""
