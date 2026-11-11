@@ -123,3 +123,17 @@ describe('construirContexto: cifras sobre todas las filas', () => {
     expect(ctx.rangos_fechas['Fecha']).toEqual(['2025-01-10', '2025-09-10'])
   })
 })
+
+describe('construirContexto: privacidad de la muestra (T-092 F4)', () => {
+  it('con incluirMuestra=false no envia header ni filas de ejemplo', () => {
+    const ctx = construirContexto({ ...base(), incluirMuestra: false })
+    expect(ctx.muestra).toEqual({ header: [], filas: [] })
+    expect(JSON.stringify(ctx.muestra)).not.toContain('Ana Perez')
+  })
+
+  it('por defecto (demo) la muestra se envia como antes', () => {
+    const ctx = construirContexto(base())
+    expect(ctx.muestra.header).toEqual(header)
+    expect(ctx.muestra.filas.length).toBe(filas.length)
+  })
+})

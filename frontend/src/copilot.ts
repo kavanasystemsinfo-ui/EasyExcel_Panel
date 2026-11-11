@@ -35,6 +35,8 @@ export type EntradaContexto = {
   alertas: string[]
   header: string[]
   filas: unknown[][]
+  // false: la muestra de filas no se envía (libros subidos por el usuario).
+  incluirMuestra?: boolean
 }
 
 function truncar(texto: string): string {
@@ -116,10 +118,13 @@ function resumenNumerico(header: string[], filas: unknown[][]) {
 
 export function construirContexto(entrada: EntradaContexto): ContextoCopiloto {
   const { hoja, seccion, filtros, kpis, alertas, header, filas } = entrada
+  const incluirMuestra = entrada.incluirMuestra ?? true
 
-  const muestraFilas = filas
-    .slice(0, MAX_MUESTRA_FILAS)
-    .map((fila) => header.map((col, c) => truncar(formatCelda(col, fila[c]))))
+  const muestraFilas = incluirMuestra
+    ? filas
+        .slice(0, MAX_MUESTRA_FILAS)
+        .map((fila) => header.map((col, c) => truncar(formatCelda(col, fila[c]))))
+    : []
 
   const conteos: Record<string, ValorDistinto[]> = {}
   let columnas = 0
@@ -140,7 +145,7 @@ export function construirContexto(entrada: EntradaContexto): ContextoCopiloto {
     kpis,
     alertas,
     conteos,
-    muestra: { header, filas: muestraFilas },
+    muestra: { header: incluirMuestra ? header : [], filas: muestraFilas },
     total_filas: filas.length,
     estadisticas,
     cruces,
