@@ -47,15 +47,25 @@ class WorkbookStorage:
         b64_path = self._dir(wb_id) / "book.b64"
         b64_path.write_text(base64.b64encode(data).decode("ascii"))
 
-    def finalize(self, wb_id: str, filename: str, sheets: list[dict]) -> dict:
+    def finalize(
+        self,
+        wb_id: str,
+        filename: str,
+        sheets: list[dict],
+        extra: dict | None = None,
+    ) -> dict:
         manifest = {
             "id": wb_id,
             "filename": filename,
             "uploaded_at": datetime.now(UTC).isoformat(),
             "sheets": sheets,
         }
+        if extra:
+            manifest.update(extra)
         manifest_path = self._dir(wb_id) / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+        )
         return manifest
 
     def get(self, wb_id: str) -> dict | None:
