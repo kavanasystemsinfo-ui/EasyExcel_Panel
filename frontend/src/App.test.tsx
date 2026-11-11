@@ -395,4 +395,87 @@ describe('Asistente IA (Fase 6)', () => {
   })
 })
 
+describe('Arranque en frío del demo (T-092 F4)', () => {
+  const manifestDemo = {
+    id: 'd3e0demo000000000000000000000000',
+    filename: 'easyexcel_demo.xlsx',
+    uploaded_at: '2026-10-05T00:00:00+00:00',
+    sheets: [{ name: 'Ventas', rows: 2, cols: 2 }],
+  }
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function mock(demo: () => Response) {
+    const fetchMock = vi.fn((url: string | URL | Request) => {
+      const href = String(url)
+      if (href.includes('/sheets/Ventas/rows')) return Promise.resolve(jsonResponse(sheetRows))
+      if (href.endsWith('/workbooks/demo')) return Promise.resolve(demo())
+      return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('un 503 seguido de un éxito acaba cargando el demo', async () => {
+    vi.useFakeTimers()
+    let llamadas = 0
+    const fetchMock = mock(() =>
+      ++llamadas === 1 ? jsonResponse({}, 503) : jsonResponse(manifestDemo),
+    )
+    render(<App />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(screen.getByText(/Sesión local/)).toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/workbooks/demo'))).toHaveLength(2)
+  })
+
+  it('a los 8 s sin respuesta avisa de que el servidor está arrancando', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    render(<App />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(7900)
+    })
+    expect(screen.queryByText(/servidor gratuito está arrancando/)).not.toBeInTheDocument()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    expect(screen.getByText(/servidor gratuito está arrancando/)).toBeInTheDocument()
+  })
+
+  it('si fallan los 4 intentos muestra el error y Reintentar vuelve a probar', async () => {
+    vi.useFakeTimers()
+    let fallar = true
+    const fetchMock = mock(() =>
+      fallar ? jsonResponse({}, 503) : jsonResponse(manifestDemo),
+    )
+    render(<App />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000 + 10000 + 20000 + 100)
+    })
+    const llamadasDemo = () =>
+      fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/workbooks/demo')).length
+    expect(llamadasDemo()).toBe(4)
+    expect(screen.getByText('Error HTTP 503')).toBeInTheDocument()
+    fallar = false
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(screen.getByText(/Sesión local/)).toBeInTheDocument()
+  })
+
+  it('un 404 no se reintenta', async () => {
+    vi.useFakeTimers()
+    const fetchMock = mock(() => jsonResponse({ detail: 'No existe' }, 404))
+    render(<App />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/workbooks/demo'))).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  })
+})

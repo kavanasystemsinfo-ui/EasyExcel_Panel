@@ -58,6 +58,16 @@ function messageOf(error: unknown, fallback: string): string {
 }
 
 const AVISO_LENTO_MS = 5000
+const DEMO_AVISO_MS = 8000
+const DEMO_ESPERAS_MS = [5000, 10000, 20000]
+const AVISO_ARRANQUE = 'El servidor gratuito está arrancando, puede tardar hasta un minuto…'
+
+// api.ts no expone el estado HTTP: un fallo de red llega como TypeError y un 5xx
+// sin cuerpo JSON como "Error HTTP 5xx". Los 4xx no se reintentan.
+function esErrorReintentable(error: unknown): boolean {
+  if (error instanceof TypeError) return true
+  return error instanceof Error && /^Error HTTP 5\d\d$/.test(error.message)
+}
 const AVISO_LENTO =
   'Analizando el archivo… en el servidor gratuito un Excel grande puede tardar hasta un minuto'
 // El backend responde 422 con este texto cuando el parseo agota el tiempo.
@@ -104,6 +114,9 @@ function App() {
   const [demoCargando, setDemoCargando] = useState(true)
   const [busy, setBusy] = useState(false)
   const [subidaLenta, setSubidaLenta] = useState(false)
+  const [demoLento, setDemoLento] = useState(false)
+  const [demoFallo, setDemoFallo] = useState(false)
+  const [incluirFilas, setIncluirFilas] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [rowsError, setRowsError] = useState<string | null>(null)
   const [avisoLocal, setAvisoLocal] = useState<string | null>(null)
@@ -136,6 +149,7 @@ function App() {
     setFiltros([])
     setDestacada(null)
     setRowsError(null)
+    setIncluirFilas(false)
     guardarSesion({
       token: tok,
       cambios: 0,
@@ -146,17 +160,32 @@ function App() {
 
   async function iniciarDemo() {
     setDemoCargando(true)
+    setDemoFallo(false)
+    setDemoLento(false)
     setUploadError(null)
+    const aviso = setTimeout(() => setDemoLento(true), DEMO_AVISO_MS)
     try {
-      const manifest = await getDemo()
-      const completo = await cargarHojas(manifest)
-      if (wbRef.current) return
-      instalar(completo)
-    } catch (error: unknown) {
-      if (!wbRef.current) {
-        setUploadError(messageOf(error, 'No se pudo cargar el libro demo'))
+      for (let intento = 0; ; intento++) {
+        try {
+          const manifest = await getDemo()
+          const completo = await cargarHojas(manifest)
+          if (wbRef.current) return
+          instalar(completo)
+          return
+        } catch (error: unknown) {
+          if (wbRef.current) return
+          if (intento >= DEMO_ESPERAS_MS.length || !esErrorReintentable(error)) {
+            setUploadError(messageOf(error, 'No se pudo cargar el libro demo'))
+            setDemoFallo(true)
+            return
+          }
+          await new Promise((resolver) => setTimeout(resolver, DEMO_ESPERAS_MS[intento]))
+          if (wbRef.current) return
+        }
       }
     } finally {
+      clearTimeout(aviso)
+      setDemoLento(false)
       setDemoCargando(false)
     }
   }
@@ -399,6 +428,7 @@ function App() {
       alertas: alertasActuales.map((alerta) => alerta.texto),
       header: hojaActiva?.header ?? [],
       filas: pares.map(({ fila }) => fila),
+      incluirMuestra: esDemo || incluirFilas,
     })
   }, [
     hojaActiva,
@@ -411,6 +441,8 @@ function App() {
     hoja,
     nombreSeccion,
     pares,
+    esDemo,
+    incluirFilas,
   ])
 
   function seleccionarHoja(name: string) {
@@ -497,6 +529,16 @@ function App() {
           </div>
         </header>
         <UploadZone onFile={handleFile} busy={busy} error={uploadError} />
+        {demoCargando && demoLento ? (
+          <p role="status" className="loading">
+            {AVISO_ARRANQUE}
+          </p>
+        ) : null}
+        {demoFallo ? (
+          <button type="button" className="btn btn-primary" onClick={() => void iniciarDemo()}>
+            Reintentar
+          </button>
+        ) : null}
         {subidaLenta ? (
           <p role="status" className="loading">
             {AVISO_LENTO}
@@ -612,6 +654,8 @@ function App() {
               guardarCopiloto(copilotoAbierto ? 'cerrado' : 'abierto')
             }
             esDemo={esDemo}
+            incluirFilas={incluirFilas}
+            onIncluirFilas={setIncluirFilas}
             sugerencias={
               esDemo
                 ? undefined

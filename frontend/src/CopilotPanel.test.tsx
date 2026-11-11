@@ -246,3 +246,22 @@ describe('CopilotPanel', () => {
   })
 })
 
+describe('CopilotPanel: casilla de privacidad (T-092 F4)', () => {
+  it('no aparece con el demo', () => {
+    render(<CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} esDemo onIncluirFilas={vi.fn()} />)
+    expect(screen.queryByLabelText(/Incluir filas de ejemplo/)).not.toBeInTheDocument()
+  })
+
+  it('con un libro subido aparece desmarcada y avisa del proveedor externo', () => {
+    const onIncluir = vi.fn()
+    render(
+      <CopilotPanel contexto={contexto} abierto onToggle={vi.fn()} esDemo={false} onIncluirFilas={onIncluir} />,
+    )
+    const casilla = screen.getByLabelText(
+      'Incluir filas de ejemplo (se envían a un proveedor de IA externo)',
+    ) as HTMLInputElement
+    expect(casilla.checked).toBe(false)
+    fireEvent.click(casilla)
+    expect(onIncluir).toHaveBeenCalledWith(true)
+  })
+})

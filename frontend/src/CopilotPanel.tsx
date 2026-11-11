@@ -26,9 +26,19 @@ type Props = {
   onToggle: () => void
   sugerencias?: string[]
   esDemo?: boolean
+  incluirFilas?: boolean
+  onIncluirFilas?: (valor: boolean) => void
 }
 
-function CopilotPanel({ contexto, abierto, onToggle, sugerencias, esDemo = true }: Props) {
+function CopilotPanel({
+  contexto,
+  abierto,
+  onToggle,
+  sugerencias,
+  esDemo = true,
+  incluirFilas = false,
+  onIncluirFilas,
+}: Props) {
   const chips = sugerencias ?? (esDemo ? SUGERENCIAS : SUGERENCIAS_GENERICAS)
   const [valor, setValor] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -105,6 +115,17 @@ function CopilotPanel({ contexto, abierto, onToggle, sugerencias, esDemo = true 
               {enviando ? 'Pensando…' : 'Enviar'}
             </button>
           </div>
+
+          {!esDemo && onIncluirFilas ? (
+            <label className="copilot-privacidad">
+              <input
+                type="checkbox"
+                checked={incluirFilas}
+                onChange={(event) => onIncluirFilas(event.target.checked)}
+              />{' '}
+              Incluir filas de ejemplo (se envían a un proveedor de IA externo)
+            </label>
+          ) : null}
 
           <p className="copilot-chips">
             {chips.map((texto) => (
