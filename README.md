@@ -108,6 +108,7 @@ Cualquiera con el enlace puede verlo y descargarlo como `.xlsx`; nadie puede edi
 | Control | Valor |
 |---|---|
 | Upload | 10 MB leídos en bloques de 1 MB (413 al primer bloque que desborda), validación extensión + magic bytes, **30 subidas/hora por IP** (429 antes de leer el body) |
+| Tiempo de parseo | En el plan gratuito de Render, un Excel de unas 30.000 filas tarda unos 40 s; archivos mucho mayores pueden rechazarse por tiempo (422) |
 | Estructura del libro | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export |
 | Parseo | subproceso aislado (spawn) con timeout y límite de memoria, y comprobación de zip; nunca en el hilo de la petición |
 | Caducidad | los Excel subidos caducan a las 2 h y se purgan cada 10 minutos y al subir (el demo no caduca) |

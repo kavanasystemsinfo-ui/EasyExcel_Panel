@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -89,6 +89,85 @@ describe('App', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('El archivo supera 10 MB'),
     )
+  })
+})
+
+describe('Subida lenta (T-092 F4)', () => {
+  const AVISO = /Analizando el archivo… en el servidor gratuito un Excel grande puede tardar hasta un minuto/
+
+  function subir() {
+    render(<App />)
+    const input = screen.getByLabelText(/archivo excel/i)
+    const file = new File(['x'], 'grande.xlsx', { type: 'application/octet-stream' })
+    fireEvent.change(input, { target: { files: [file] } })
+  }
+
+  it('avisa a los 5 s y lo quita al terminar', async () => {
+    vi.useFakeTimers()
+    let resolver: (r: Response) => void = () => {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>((resolve) => (resolver = resolve))),
+    )
+    try {
+      subir()
+      await act(async () => {
+        vi.advanceTimersByTime(4000)
+      })
+      expect(screen.queryByText(AVISO)).not.toBeInTheDocument()
+      await act(async () => {
+        vi.advanceTimersByTime(1500)
+      })
+      expect(screen.getByRole('status')).toHaveTextContent(AVISO)
+      await act(async () => {
+        resolver(jsonResponse(workbookFull, 201))
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+    await waitFor(() => expect(screen.queryByText(AVISO)).not.toBeInTheDocument())
+  })
+
+  it('no avisa si la subida es rápida', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(workbookFull, 201))))
+    subir()
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByText(AVISO)).not.toBeInTheDocument()
+  })
+
+  it('en un 422 por tiempo añade el consejo', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              detail:
+                'El archivo es demasiado grande para analizarlo, prueba a quitar columnas o hojas',
+            },
+            422,
+          ),
+        ),
+      ),
+    )
+    subir()
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Prueba con menos filas o divide el archivo en varias hojas',
+      ),
+    )
+  })
+
+  it('un 422 que no es de tiempo no lleva el consejo', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse({ detail: 'Maximo 50 hojas por libro' }, 422))),
+    )
+    subir()
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Maximo 50 hojas'))
+    expect(screen.getByRole('alert')).not.toHaveTextContent('divide el archivo')
   })
 })
 
