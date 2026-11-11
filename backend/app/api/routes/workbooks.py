@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import re
 import secrets
@@ -6,12 +7,14 @@ from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, Query, Request, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.demo import DEMO_ALIAS, DEMO_ID, ensure_demo
 from app.core.ratelimit import RateLimiter, ip_real
 from app.core.storage import WorkbookStorage
 from app.domain import excel_parser
+from app.domain.aislado import run_isolated
 
 from ...errors import (
     ForbiddenError,
@@ -26,6 +29,9 @@ router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 # Cuota de subidas por IP (ADR-0006): se consume antes de leer el body,
 # asi que un atacante no puede materializar 10 MB para recibir un 429.
 _subidas = RateLimiter()
+
+# Un solo parseo pesado a la vez: Render gratis tiene 512 MB de RAM.
+_parseo_sem = asyncio.Semaphore(1)
 
 ZIP_MAGIC = b"PK\x03\x04"
 OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -114,23 +120,14 @@ async def upload_workbook(
     workbook_id = storage.save_book(data)
     try:
         book_path = storage.book_path(workbook_id)
-        sheets_meta: list[dict] = excel_parser.extract_metadata(book_path, filename)
-        sheets_full: list[dict] = []
-        for s in sheets_meta:
-            payload = excel_parser.read_rows(
-                book_path, s["name"], 0, s["rows"] or 1, filename
-            )
-            sheets_full.append(
-                {
-                    "name": s["name"],
-                    "rows": s["rows"],
-                    "cols": s["cols"],
-                    "header_row": s.get("header_row", 1),
-                    "truncada": s.get("truncada"),
-                    "aviso": s.get("aviso"),
-                    "header": payload.get("header", []),
-                    "data": payload.get("rows", []),
-                }
+        async with _parseo_sem:
+            sheets_meta, sheets_full = await run_in_threadpool(
+                run_isolated,
+                excel_parser.parse_workbook_full,
+                str(book_path),
+                filename,
+                timeout_s=settings.parse_timeout_s,
+                mem_mb=settings.parse_mem_mb,
             )
     except Exception:
         storage.delete(workbook_id)
@@ -171,9 +168,22 @@ def get_sheet_rows(
         raise WorkbookNotFoundError(f"La hoja '{sheet_name}' no existe")
     storage = _storage()
     book_path = storage._ensure_book_exists(manifest["id"])
-    payload = excel_parser.read_rows(
-        book_path, sheet_name, offset, limit, manifest.get("filename")
-    )
+    if manifest["id"] == DEMO_ID:
+        # Archivo de confianza con cache: se queda en el proceso.
+        payload = excel_parser.read_rows(
+            book_path, sheet_name, offset, limit, manifest.get("filename")
+        )
+    else:
+        payload = run_isolated(
+            excel_parser.read_rows,
+            book_path,
+            sheet_name,
+            offset,
+            limit,
+            manifest.get("filename"),
+            timeout_s=settings.parse_timeout_s,
+            mem_mb=settings.parse_mem_mb,
+        )
     return {
         "sheet": sheet_name,
         "offset": offset,

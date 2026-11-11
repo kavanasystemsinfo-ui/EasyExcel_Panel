@@ -1007,8 +1007,27 @@ def _read_rows_generic(
     return _read_rows_from_sheets(_load_sheets(path, fmt, nombre), sheet, offset, limit)
 
 
+def _comprobar_zip(path: str) -> None:
+    """Defensa contra zip bombs en .xlsx y .ods."""
+    msg = "El archivo comprimido no es válido o es demasiado grande"
+    try:
+        with zipfile.ZipFile(path) as zf:
+            infos = zf.infolist()
+    except zipfile.BadZipFile as exc:
+        raise InvalidWorkbookError(msg) from exc
+    if len(infos) > 10_000:
+        raise InvalidWorkbookError(msg)
+    if sum(i.file_size for i in infos) > settings.max_unzipped_mb * 1024 * 1024:
+        raise InvalidWorkbookError(msg)
+    for i in infos:
+        if i.compress_size > 0 and i.file_size / i.compress_size > 200:
+            raise InvalidWorkbookError(msg)
+
+
 def extract_metadata(path: Path, nombre: str | None = None) -> list[dict]:
     fmt = _detect_format(str(path))
+    if fmt in ("xlsx", "ods"):
+        _comprobar_zip(str(path))
     if fmt == "xlsx":
         sheets = _run_with_timeout(
             _extract_metadata_sync, str(path), timeout_s=settings.parse_timeout_s
@@ -1027,6 +1046,8 @@ def read_rows(
     path: Path, sheet: str, offset: int, limit: int, nombre: str | None = None
 ) -> dict:
     fmt = _detect_format(str(path))
+    if fmt in ("xlsx", "ods"):
+        _comprobar_zip(str(path))
     if fmt == "xlsx":
         return _run_with_timeout(
             _read_rows_sync,
@@ -1038,6 +1059,31 @@ def read_rows(
         str(path), fmt, nombre, sheet, offset, limit,
         timeout_s=settings.parse_timeout_s,
     )
+
+
+def parse_workbook_full(
+    book_path: str, filename: str
+) -> tuple[list[dict], list[dict]]:
+    """Metadatos + filas de todas las hojas. De nivel de modulo para poder
+    ejecutarse en un subproceso (ver app.domain.aislado)."""
+    path = Path(book_path)
+    sheets_meta = extract_metadata(path, filename)
+    sheets_full: list[dict] = []
+    for s in sheets_meta:
+        payload = read_rows(path, s["name"], 0, s["rows"] or 1, filename)
+        sheets_full.append(
+            {
+                "name": s["name"],
+                "rows": s["rows"],
+                "cols": s["cols"],
+                "header_row": s.get("header_row", 1),
+                "truncada": s.get("truncada"),
+                "aviso": s.get("aviso"),
+                "header": payload.get("header", []),
+                "data": payload.get("rows", []),
+            }
+        )
+    return sheets_meta, sheets_full
 
 
 # ------------------------------------------------------------------ export
