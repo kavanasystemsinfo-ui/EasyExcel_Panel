@@ -126,7 +126,7 @@ async def upload_workbook(
                 excel_parser.parse_workbook_full,
                 str(book_path),
                 filename,
-                timeout_s=settings.parse_timeout_s,
+                timeout_s=settings.parse_total_timeout_s,
                 mem_mb=settings.parse_mem_mb,
             )
     except Exception:
@@ -162,6 +162,7 @@ def get_sheet_rows(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:
+    _purge()
     manifest = _get_manifest(workbook_id)
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}
     if sheet_name not in sheet_names:
@@ -181,7 +182,7 @@ def get_sheet_rows(
             offset,
             limit,
             manifest.get("filename"),
-            timeout_s=settings.parse_timeout_s,
+            timeout_s=settings.parse_total_timeout_s,
             mem_mb=settings.parse_mem_mb,
         )
     return {

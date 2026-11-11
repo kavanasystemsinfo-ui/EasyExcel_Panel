@@ -32,7 +32,7 @@ flowchart LR
     BE -- "lectura/escritura" --> DISCO
     BE -- "POST /api/v1/copiloto (SSE)" --> OR
     OR -- "429 / sin cuota" --> NV
-    BE -. "subproceso con timeout" .-> PARSER["excel_parser<br/>openpyxl · xlrd · odfpy · csv"]
+    BE -. "subproceso aislado (spawn)<br/>timeout + límite de memoria" .-> PARSER["excel_parser<br/>openpyxl · xlrd · odfpy · csv"]
     PARSER -.-> DISCO
     push["git push a main"] --> JOB1
     push --> JOB2
@@ -49,8 +49,8 @@ flowchart LR
    `copiloto` (SSE) y `health`.
 3. Los Excel viven en disco efímero (`/tmp/easyexcel-uploads`, plan gratuito; se vacía al reiniciar): cada libro
    es un `.xlsx` + un `manifest.json` con su metadato (ADR-0002). Las subidas
-   caducan a las 2 h y se purgan en cada operación (ADR-0004).
-4. El parseo ocurre en un subproceso con timeout y límites (10 MB, 50 hojas,
+   caducan a las 2 h y se purgan cada 10 minutos y al subir (ADR-0004).
+4. El parseo ocurre en un subproceso aislado (spawn) con timeout y límite de memoria, y comprobación de zip (10 MB, 50 hojas,
    200 columnas, 100.000 filas) — nunca en el hilo de la petición (ADR-0001).
 5. El copiloto serializa un contexto acotado (KPIs, alertas, conteos y una
    muestra de filas), lo manda por SSE a la cadena de modelos gratuitos y
@@ -65,7 +65,7 @@ backend/app/
   core/config.py     Settings (env EASYEXCEL_*) + límites
   core/storage.py    FS + manifest, purga TTL, validación de path
   core/demo.py       generador del dataset de muestra (semilla fija)
-  domain/excel_parser.py  parseo multi-formato en subproceso con timeout
+  domain/excel_parser.py  parseo multi-formato en subproceso aislado (spawn) con timeout y límite de memoria
   ai/assistant.py    cadena de proveedores, rate limit por IP, caché
 
 frontend/src/
@@ -83,7 +83,7 @@ frontend/src/
 | Tamaño de upload | 10 MB, leídos en bloques de 1 MB (413 al primer bloque desbordado) | `api/routes/workbooks.py` |
 | Cuota de subidas | 30/hora por IP real (última IP de `X-Forwarded-For`), 429 antes de leer el body | `core/ratelimit.py` + `workbooks.py` (ADR-0006) |
 | Estructura | 50 hojas · 200 columnas · 100.000 filas · 2.000.000 celdas de export | `core/config.py` |
-| Parseo | subproceso con timeout (SIGALRM en Unix, sin timeout en Windows) | `domain/excel_parser.py` |
+| Parseo | subproceso aislado (spawn) con timeout y límite de memoria, y comprobación de zip | `domain/excel_parser.py` |
 | Caducidad de subidas | 2 h (`EASYEXCEL_UPLOAD_TTL_HOURS`) | `core/storage.py` (ADR-0004) |
 | Copiloto | 20 consultas/día por IP real (última IP de `X-Forwarded-For`), caché de 200, `max_tokens` 1500, timeout 90 s | `ai/assistant.py`, `api/routes/copiloto.py` (ADR-0006) |
 | HTML del copiloto | escape de `&`, `<`, `>` antes del markdown, con tests de DOM | `frontend/src/copilotRender.ts` |

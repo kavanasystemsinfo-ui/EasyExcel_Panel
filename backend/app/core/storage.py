@@ -1,4 +1,3 @@
-import base64
 import json
 import re
 import shutil
@@ -10,10 +9,11 @@ _ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 class WorkbookStorage:
-    """Persistencia en filesystem: un UUID por workbook con su manifest.
-    
-    En Vercel serverless, /tmp no persiste entre invocaciones.
-    Solución: almacenar el contenido del archivo (base64) en el manifest.
+    """Persistencia en filesystem: un directorio por workbook (UUID) con
+    `book.xlsx` y `manifest.json`. Sin copias duplicadas del archivo.
+
+    Las subidas son efimeras: `purge_expired` borra las que superan el TTL
+    (lo ejecuta una tarea periodica y las rutas de subida/lectura).
     """
 
     def __init__(self, root: Path):
@@ -33,9 +33,6 @@ class WorkbookStorage:
         wb_id = uuid.uuid4().hex
         self._dir(wb_id).mkdir(parents=True, exist_ok=True)
         self.book_path(wb_id).write_bytes(data)
-        # Also store base64 in a sidecar for serverless recovery
-        b64_path = self._dir(wb_id) / "book.b64"
-        b64_path.write_text(base64.b64encode(data).decode("ascii"))
         return wb_id
 
     def save_book_as(self, wb_id: str, data: bytes) -> None:
@@ -43,9 +40,6 @@ class WorkbookStorage:
             raise ValueError(f"Id no valido: {wb_id!r}")
         self._dir(wb_id).mkdir(parents=True, exist_ok=True)
         self.book_path(wb_id).write_bytes(data)
-        # Store base64 for serverless recovery
-        b64_path = self._dir(wb_id) / "book.b64"
-        b64_path.write_text(base64.b64encode(data).decode("ascii"))
 
     def finalize(
         self,
@@ -81,19 +75,10 @@ class WorkbookStorage:
         return manifest if isinstance(manifest, dict) else None
 
     def _ensure_book_exists(self, wb_id: str) -> Path:
-        """Asegura que book.xlsx existe, regenerando desde base64 si es necesario."""
+        """Devuelve la ruta de book.xlsx; FileNotFoundError si no existe."""
         book_path = self.book_path(wb_id)
         if book_path.is_file():
             return book_path
-        # Intentar regenerar desde book.b64
-        b64_path = self._dir(wb_id) / "book.b64"
-        if b64_path.is_file():
-            try:
-                data = base64.b64decode(b64_path.read_text(encoding="ascii"))
-                book_path.write_bytes(data)
-                return book_path
-            except Exception:
-                pass
         raise FileNotFoundError(f"No se pudo recuperar el libro {wb_id}")
 
     def list(self) -> list[dict]:
