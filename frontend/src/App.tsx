@@ -57,6 +57,13 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+const AVISO_LENTO_MS = 5000
+const AVISO_LENTO =
+  'Analizando el archivo… en el servidor gratuito un Excel grande puede tardar hasta un minuto'
+// El backend responde 422 con este texto cuando el parseo agota el tiempo.
+const TEXTO_TIMEOUT = 'demasiado grande para analizarlo'
+const CONSEJO_TIMEOUT = 'Prueba con menos filas o divide el archivo en varias hojas'
+
 async function cargarHojas(manifest: Workbook): Promise<WorkbookFull> {
   const hojas = await Promise.all(
     manifest.sheets.map(async (sheet) => {
@@ -96,6 +103,7 @@ function App() {
   const [pagina, setPagina] = useState(0)
   const [demoCargando, setDemoCargando] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [subidaLenta, setSubidaLenta] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [rowsError, setRowsError] = useState<string | null>(null)
   const [avisoLocal, setAvisoLocal] = useState<string | null>(null)
@@ -231,6 +239,7 @@ function App() {
     setUploadError(null)
     setRowsError(null)
     setAvisoLocal(null)
+    const temporizador = setTimeout(() => setSubidaLenta(true), AVISO_LENTO_MS)
     try {
       const full = await uploadWorkbook(file)
       borrarSesion()
@@ -249,8 +258,15 @@ function App() {
       }
       instalar(wbFull, 'datos')
     } catch (error: unknown) {
-      setUploadError(messageOf(error, 'No se pudo cargar el archivo'))
+      const mensaje = messageOf(error, 'No se pudo cargar el archivo')
+      setUploadError(
+        mensaje.includes(TEXTO_TIMEOUT)
+          ? `${mensaje.replace(/[.\s]+$/, '')}. ${CONSEJO_TIMEOUT}`
+          : mensaje,
+      )
     } finally {
+      clearTimeout(temporizador)
+      setSubidaLenta(false)
       setBusy(false)
     }
   }
@@ -481,6 +497,11 @@ function App() {
           </div>
         </header>
         <UploadZone onFile={handleFile} busy={busy} error={uploadError} />
+        {subidaLenta ? (
+          <p role="status" className="loading">
+            {AVISO_LENTO}
+          </p>
+        ) : null}
       </main>
     )
   }
@@ -563,6 +584,11 @@ function App() {
             </div>
           </section>
 
+          {subidaLenta ? (
+            <p role="status" className="loading">
+              {AVISO_LENTO}
+            </p>
+          ) : null}
           {uploadError ? (
             <p role="alert" className="error">
               {uploadError}
