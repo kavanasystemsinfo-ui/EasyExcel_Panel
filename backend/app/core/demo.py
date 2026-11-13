@@ -14,7 +14,20 @@ from app.core.storage import WorkbookStorage
 
 DEMO_FILENAME = "easyexcel_demo.xlsx"
 DEMO_ALIAS = "demo"
-DEMO_ID = hashlib.sha256(b"easyexcel:demo:v7").hexdigest()[:32]
+DEMO_ID = hashlib.sha256(b"easyexcel:demo:v8").hexdigest()[:32]
+
+
+def _puntuacion_auditoria(resultado: str, n: int) -> int:
+    """Puntuación (0-100) coherente con el resultado, sin consumir la semilla aleatoria.
+
+    El KPI de calidad del panel promedia la columna 'Puntuacion' de Auditorias; sin ella
+    mostraba 0 %. Es determinista para no alterar el resto del libro generado.
+    """
+    if resultado == "Conforme":
+        return 90 + (n * 7) % 10
+    if resultado == "Con hallazgos":
+        return 80 + (n * 7) % 10
+    return 60 + (n * 7) % 20
 
 
 def _generate_ceramica_demo() -> bytes:
@@ -481,10 +494,11 @@ def _generate_ceramica_demo() -> bytes:
             "Hallazgo",
             "Accion",
             "Estado",
+            "Puntuacion",
         ]
     )
-    for a in auditorias:
-        ws_aud.append(a)
+    for n, a in enumerate(auditorias):
+        ws_aud.append([*a, _puntuacion_auditoria(str(a[4]), n)])
 
     # 8. Maquinaria
     ws_maq = wb.create_sheet("Maquinaria")
