@@ -127,8 +127,8 @@ function tarjetas(k: Kpis): Tarjeta[] {
       key: 'calidad',
       overline: 'CALIDAD',
       icon: 'verified',
-      valor: `${q.media}%`,
-      sub: `Media de ${q.total} auditorías`,
+      valor: q.media === null ? '—' : `${q.media}%`,
+      sub: q.media === null ? `Sin puntuación en ${q.total} auditorías` : `Media de ${q.total} auditorías`,
       footer: {
         izq: `✓ ${q.conformes} conformes`,
         izqTono: 'ok',

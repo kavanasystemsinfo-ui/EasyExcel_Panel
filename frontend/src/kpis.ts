@@ -36,7 +36,7 @@ export type MaquinariaKpi = {
   proximas30: number
 }
 
-export type CalidadKpi = { media: number; total: number; conformes: number }
+export type CalidadKpi = { media: number | null; total: number; conformes: number }
 
 export type CoberturaCentro = { nombre: string; activos: number; plantilla: number }
 
@@ -196,7 +196,7 @@ function contarCalidad(auditorias: SheetData): CalidadKpi {
     if (norm(valor(fila, iResultado)) === 'conforme') conformes++
   }
   return {
-    media: cantidad ? Math.round(suma / cantidad) : 0,
+    media: cantidad ? Math.round(suma / cantidad) : null, // null = la hoja no trae puntuaciones
     total: auditorias.rows.length,
     conformes,
   }

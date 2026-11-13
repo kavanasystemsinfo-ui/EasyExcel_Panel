@@ -114,6 +114,15 @@ describe('calcularKpis', () => {
     expect(k).toEqual({ media: 77, total: 3, conformes: 2 })
   })
 
+  it('sin columna de puntuación la calidad no inventa un 0 %', () => {
+    const sinPuntuacion: SheetData = {
+      header: ['ID', 'Resultado'],
+      rows: [['AUD1', 'Conforme'], ['AUD2', 'No Conforme']],
+    }
+    const k = calcularKpis({ ...sheets(), Auditorias: sinPuntuacion }, HOY).calidad
+    expect(k).toEqual({ media: null, total: 2, conformes: 1 })
+  })
+
   it('calcula cobertura activos vs plantilla por centro', () => {
     const c = calcularKpis(sheets(), HOY).cobertura
     expect(c).toEqual([
