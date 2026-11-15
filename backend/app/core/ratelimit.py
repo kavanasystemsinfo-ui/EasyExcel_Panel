@@ -8,10 +8,14 @@ permitir spoofing detrás del proxy de Render.
 
 from __future__ import annotations
 
+import ipaddress
+import logging
 import time
 from collections import OrderedDict
 
 from fastapi import Request
+
+logger = logging.getLogger("easyexcel.ratelimit")
 
 # Cota de memoria del mapa: las IPs no suelen crecer más que esto en una
 # ventana; al superarse se purgan las ventanas ya caducadas.
@@ -22,12 +26,25 @@ class LimiteExcedido(Exception):
     """Se superó el máximo de peticiones de una IP en la ventana."""
 
 
+def _agrupar(ip: str) -> str:
+    """Las IPv6 se agrupan por /64: un cliente suele controlar todo su /64 y,
+    contando cada direccion por separado, rotaria de cubo a voluntad."""
+    try:
+        direccion = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if isinstance(direccion, ipaddress.IPv6Address):
+        red = ipaddress.IPv6Network((direccion, 64), strict=False)
+        return f"{red.network_address}/64"
+    return ip
+
+
 def ip_real(request: Request) -> str:
     """IP del cliente tras el proxy: última entrada de X-Forwarded-For."""
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
-        return xff.split(",")[-1].strip()
-    return request.client.host if request.client else "anonimo"
+        return _agrupar(xff.split(",")[-1].strip())
+    return _agrupar(request.client.host) if request.client else "anonimo"
 
 
 class RateLimiter:
@@ -64,6 +81,11 @@ class RateLimiter:
                     if minutos == 1
                     else f"{int(minutos)} minutos"
                 )
+            # Deja rastro de quien se topa con el limite: sirve para comprobar
+            # en produccion que cada visitante cae en su propio cubo.
+            logger.warning(
+                "limite excedido: %s ip=%s limite=%d/%ss", etiqueta, ip, limite, int(ventana_s)
+            )
             raise LimiteExcedido(
                 f"Demasiadas {etiqueta}. Vuelve a intentarlo en {espera}."
             )

@@ -19,6 +19,7 @@ from app.domain.aislado import run_isolated
 from ...errors import (
     ForbiddenError,
     InvalidWorkbookError,
+    StorageFullError,
     WorkbookNotFoundError,
     WorkbookTooLargeError,
 )
@@ -29,6 +30,10 @@ router = APIRouter(prefix="/api/v1/workbooks", tags=["workbooks"])
 # Cuota de subidas por IP (ADR-0006): se consume antes de leer el body,
 # asi que un atacante no puede materializar 10 MB para recibir un 429.
 _subidas = RateLimiter()
+
+# Cuota de exportaciones por IP: construir el .xlsx es la operacion mas cara
+# de la API y corre en el proceso principal.
+_exportaciones = RateLimiter()
 
 # Un solo parseo pesado a la vez: Render gratis tiene 512 MB de RAM.
 _parseo_sem = asyncio.Semaphore(1)
@@ -117,6 +122,10 @@ async def upload_workbook(
         raise InvalidWorkbookError("El contenido no es un .csv valido")
     storage = _storage()
     storage.purge_expired(settings.upload_ttl_hours, exclude={DEMO_ID})
+    if storage.count() >= settings.max_stored_books:
+        raise StorageFullError(
+            "El servicio esta al limite de capacidad. Vuelve a intentarlo en unos minutos."
+        )
     workbook_id = storage.save_book(data)
     try:
         book_path = storage.book_path(workbook_id)
@@ -198,7 +207,14 @@ def export_sheet(
     workbook_id: str,
     sheet_name: str,
     payload: ExportPayload,
+    request: Request,
 ) -> Response:
+    _exportaciones.comprobar(
+        ip_real(request),
+        settings.export_rate_limit,
+        settings.export_rate_window_s,
+        "exportaciones",
+    )
     _purge()
     manifest = _get_manifest(workbook_id)
     sheet_names = {sheet["name"] for sheet in manifest.get("sheets", [])}

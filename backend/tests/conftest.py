@@ -9,5 +9,7 @@ from app.api.routes import workbooks
 def limpiar_rate_limit_subidas():
     """Cada test empieza con la cuota de subidas fresca (ventana de 1 hora)."""
     workbooks._subidas.limpiar()
+    workbooks._exportaciones.limpiar()
     yield
     workbooks._subidas.limpiar()
+    workbooks._exportaciones.limpiar()

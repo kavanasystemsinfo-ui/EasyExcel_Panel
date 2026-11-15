@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     max_columns: int = 200
     max_rows_per_sheet: int = 100_000
     max_export_cells: int = 2_000_000
+    # Cuerpo maximo de la peticion de exportacion (MB): se rechaza por
+    # Content-Length antes de parsear el JSON.
+    max_export_body_mb: int = 16
+    # Tope global de libros guardados a la vez (ademas de la cuota por IP).
+    max_stored_books: int = 300
     parse_timeout_s: float = 85.0
     parse_total_timeout_s: float = 90.0
     parse_mem_mb: int = 300
@@ -43,6 +48,10 @@ class Settings(BaseSettings):
     # Subidas efimeras (ADR-0004): los Excel de usuarios caducan y se
     # borran solos; solo el demo persiste. Horas de vida de una subida.
     upload_ttl_hours: float = 2.0
+
+    # Rate limit de exportaciones: por IP real, ventana de una hora.
+    export_rate_limit: int = 60
+    export_rate_window_s: float = 3600.0
 
     # Rate limit de subidas (ADR-0006): por IP real, ventana de una hora.
     upload_rate_limit: int = 30

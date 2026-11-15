@@ -25,3 +25,7 @@ class WorkbookNotFoundError(WorkbookError):
 
 class ForbiddenError(WorkbookError):
     """Token de propietario inválido o ausente."""
+
+
+class StorageFullError(WorkbookError):
+    """El servicio alcanzo su tope global de libros guardados."""

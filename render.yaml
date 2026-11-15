@@ -27,13 +27,17 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     # Health check: endpoint /health del modulo health.
     healthCheckPath: /health
-    autoDeploy: true
+    # Solo despliega cuando el CI de GitHub termina en verde (antes: cada push).
+    autoDeployTrigger: checksPass
     # Plan gratuito: sin disco persistente (los discos exigen plan de pago).
     # No hace falta: el navegador descarga todas las filas justo despues de
     # subir el Excel y los archivos solo viven unas horas (TTL), asi que el
     # disco efimero del plan gratuito basta.
     plan: free
     envVars:
+      # Misma version que el CI y .python-version: lo probado es lo desplegado.
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: EASYEXCEL_OPENROUTER_API_KEY
         sync: false
       - key: EASYEXCEL_NVIDIA_API_KEY
@@ -44,7 +48,7 @@ services:
       # CORS: allow_origins vacio porque el proxy serve todo desde el mismo
       # origen. Se deja el dominio propio por si el frontend se sirve aparte.
       - key: EASYEXCEL_CORS_ORIGINS
-        value: '["https://easyexcel.kavanasystems.com","http://localhost:5173","http://localhost:8000"]'
+        value: '["https://easyexcel.kavanasystems.com"]'
 
   # ── Frontend estatico ──────────────────────────────────────────────────
   - type: web

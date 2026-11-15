@@ -49,6 +49,7 @@ from odf import table as odf_table
 from odf import teletype
 from odf.opendocument import load as ods_load
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.utils import range_boundaries
 
 from app.core.config import settings
@@ -1098,6 +1099,18 @@ def _export_scalar(value: Any) -> Any:
     return text[:_EXPORT_CELL_LIMIT]
 
 
+def _export_cell(sheet, value: Any) -> Any:
+    """Celda lista para escribir. Un texto que empieza por "=" se fuerza a
+    tipo texto: openpyxl lo marcaria como formula y Excel la ejecutaria al
+    abrir el archivo exportado (inyeccion de formulas desde hojas ajenas)."""
+    escalar = _export_scalar(value)
+    if isinstance(escalar, str) and escalar.startswith("="):
+        celda = WriteOnlyCell(sheet, value=escalar)
+        celda.data_type = "s"
+        return celda
+    return escalar
+
+
 def build_export(header: list[str], rows: list[list[Any]]) -> bytes:
     if not header:
         raise InvalidWorkbookError("La exportacion necesita al menos una columna")
@@ -1115,11 +1128,13 @@ def build_export(header: list[str], rows: list[list[Any]]) -> bytes:
                 f"La fila {index} tiene {len(row)} valores "
                 f"y la cabecera {len(header)} columnas"
             )
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.append([_export_scalar(cell) for cell in header])
+    # write_only: las filas se escriben en streaming y no se materializa el
+    # libro entero (2M celdas pasaban de 790 MB de RAM en modo normal).
+    workbook = Workbook(write_only=True)
+    sheet = workbook.create_sheet()
+    sheet.append([_export_cell(sheet, cell) for cell in header])
     for row in rows:
-        sheet.append([_export_scalar(cell) for cell in row])
+        sheet.append([_export_cell(sheet, cell) for cell in row])
     buf = BytesIO()
     workbook.save(buf)
     return buf.getvalue()
