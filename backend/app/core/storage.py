@@ -93,6 +93,14 @@ class WorkbookStorage:
         manifests.sort(key=lambda m: str(m.get("uploaded_at", "")), reverse=True)
         return manifests
 
+    def count(self) -> int:
+        """Numero de directorios de libro (sin leer manifests: es barato)."""
+        if not self.root.is_dir():
+            return 0
+        return sum(
+            1 for child in self.root.iterdir() if child.is_dir() and self.valid_id(child.name)
+        )
+
     def delete(self, wb_id: str) -> bool:
         if not self.valid_id(wb_id):
             return False
