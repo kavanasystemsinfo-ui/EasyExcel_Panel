@@ -528,12 +528,15 @@ function App() {
             </p>
           </div>
         </header>
-        <UploadZone onFile={handleFile} busy={busy} error={uploadError} />
-        {demoCargando && demoLento ? (
-          <p role="status" className="loading">
-            {AVISO_ARRANQUE}
-          </p>
-        ) : null}
+        {demoCargando ? (
+          <div className="demo-espera" role="status" aria-live="polite" data-testid="demo-espera">
+            <span className="demo-espera-spinner" aria-hidden="true" />
+            <h2>Abriendo el Excel de ejemplo</h2>
+            <p>{demoLento ? AVISO_ARRANQUE : 'En unos segundos podrás explorarlo.'}</p>
+          </div>
+        ) : (
+          <UploadZone onFile={handleFile} busy={busy} error={uploadError} />
+        )}
         {demoFallo ? (
           <button type="button" className="btn btn-primary" onClick={() => void iniciarDemo()}>
             Reintentar

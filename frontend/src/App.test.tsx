@@ -46,10 +46,20 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('muestra la zona de carga al arrancar', () => {
+  it('mientras carga el demo muestra la espera y NO ofrece subir un archivo', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
     render(<App />)
     expect(screen.getByRole('heading', { name: 'EasyExcel Panel' })).toBeInTheDocument()
-    expect(screen.getByTestId('upload-zone')).toBeInTheDocument()
+    expect(screen.getByTestId('demo-espera')).toBeInTheDocument()
+    expect(screen.queryByTestId('upload-zone')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Elegir archivo/ })).not.toBeInTheDocument()
+  })
+
+  it('si el demo no carga, ofrece la zona de subida', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse({ detail: 'no' }, 400))))
+    render(<App />)
+    expect(await screen.findByTestId('upload-zone')).toBeInTheDocument()
+    expect(screen.queryByTestId('demo-espera')).not.toBeInTheDocument()
   })
 
   it('sube un archivo, carga la hoja y muestra el grid', async () => {
@@ -63,7 +73,7 @@ describe('App', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'demo.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
 
@@ -82,7 +92,7 @@ describe('App', () => {
     )
 
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'demo.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
 
@@ -95,8 +105,10 @@ describe('App', () => {
 describe('Subida lenta (T-092 F4)', () => {
   const AVISO = /Analizando el archivo… en el servidor gratuito un Excel grande puede tardar hasta un minuto/
 
-  function subir() {
+  async function subir() {
     render(<App />)
+    // El demo falla al instante en estas pruebas: así aparece la zona de subida.
+    await act(async () => {})
     const input = screen.getByLabelText(/archivo excel/i)
     const file = new File(['x'], 'grande.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
@@ -107,10 +119,14 @@ describe('Subida lenta (T-092 F4)', () => {
     let resolver: (r: Response) => void = () => {}
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => new Promise<Response>((resolve) => (resolver = resolve))),
+      vi.fn((url: string | URL | Request) =>
+        String(url).endsWith('/workbooks/demo')
+          ? Promise.resolve(jsonResponse({ detail: 'sin demo' }, 400))
+          : new Promise<Response>((resolve) => (resolver = resolve)),
+      ),
     )
     try {
-      subir()
+      await subir()
       await act(async () => {
         vi.advanceTimersByTime(4000)
       })
@@ -129,8 +145,17 @@ describe('Subida lenta (T-092 F4)', () => {
   })
 
   it('no avisa si la subida es rápida', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(workbookFull, 201))))
-    subir()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL | Request) =>
+        Promise.resolve(
+          String(url).endsWith('/workbooks/demo')
+            ? jsonResponse({ detail: 'sin demo' }, 400)
+            : jsonResponse(workbookFull, 201),
+        ),
+      ),
+    )
+    await subir()
     await waitFor(() =>
       expect(screen.getByRole('columnheader', { name: 'Producto' })).toBeInTheDocument(),
     )
@@ -152,7 +177,7 @@ describe('Subida lenta (T-092 F4)', () => {
         ),
       ),
     )
-    subir()
+    await subir()
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
         'Prueba con menos filas o divide el archivo en varias hojas',
@@ -165,7 +190,7 @@ describe('Subida lenta (T-092 F4)', () => {
       'fetch',
       vi.fn(() => Promise.resolve(jsonResponse({ detail: 'Maximo 50 hojas por libro' }, 422))),
     )
-    subir()
+    await subir()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Maximo 50 hojas'))
     expect(screen.getByRole('alert')).not.toHaveTextContent('divide el archivo')
   })
@@ -230,7 +255,7 @@ describe('App con demo automatica (Fase 3)', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'demo.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
 
@@ -292,7 +317,7 @@ describe('Libro generico (cualquier Excel)', () => {
   it('sube un Excel ajeno y pinta KPIs y alertas genericos', async () => {
     mockGenerico()
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
 
@@ -307,7 +332,7 @@ describe('Libro generico (cualquier Excel)', () => {
   it('en la vista Resumen muestra tarjetas de filas y suma', async () => {
     mockGenerico()
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
     await waitFor(() =>
@@ -325,7 +350,7 @@ describe('Libro generico (cualquier Excel)', () => {
   it('el sidebar solo ofrece Resumen y Datos', async () => {
     mockGenerico()
     render(<App />)
-    const input = screen.getByLabelText(/archivo excel/i)
+    const input = await screen.findByLabelText(/archivo excel/i)
     const file = new File(['x'], 'informe_ventas.xlsx', { type: 'application/octet-stream' })
     fireEvent.change(input, { target: { files: [file] } })
     await waitFor(() =>

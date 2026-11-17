@@ -4,6 +4,9 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Changed
+- **Espera del libro demo (17/11/2026)**: mientras el demo carga ya no se muestra la zona de subida (el visitante intentaba subir su archivo sin esperar); se ve una pantalla de espera con spinner y, a los 8 s, el aviso de arranque del servidor gratuito. La zona de subida solo aparece si el demo falla (con «Reintentar»).
+
 ### Added
 - **Calidad de la demo (13/11/2026)**: la tarjeta CALIDAD mostraba «0 %» con 10 conformes de 30 auditorías porque la hoja `Auditorias` del libro cerámico (ADR-0008) no traía la columna `Puntuacion` que lee el KPI. El generador la añade (determinista, sin consumir la semilla: el resto del libro no cambia) y `DEMO_ID` pasa a `v8` para que Render reseñe el libro; además, si un Excel subido no trae puntuaciones, la tarjeta muestra «—» en lugar de inventar un 0 %. 2 tests de backend y 1 de frontend que fallaban antes de la corrección.
 - **T-092 Fase 3 (11/11/2026)**: el almacenamiento ya no guarda la copia `book.b64` de cada subida; purga periódica cada 10 minutos (tarea en el `lifespan` de la app) además de la purga al subir, leer filas y exportar; el copiloto usa `ip_real()` en lugar de repetir el cálculo de IP; el timeout del parseo aislado pasa a ser total (`parse_total_timeout_s`, 90 s) porque la Fase 2 aplicaba 30 s a todo el parseo y un `.xlsx` de 30.000 filas daba 422; README y ARCHITECTURE describen el parseo y la retención tal como son, y el README añade el apartado «Camino a producción».
