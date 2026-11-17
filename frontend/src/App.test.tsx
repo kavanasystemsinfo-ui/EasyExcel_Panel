@@ -504,3 +504,49 @@ describe('Arranque en frío del demo (T-092 F4)', () => {
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
   })
 })
+
+describe('Tour guiado', () => {
+  const manifest = {
+    id: 'd3e0demo000000000000000000000000',
+    filename: 'mi_excel.xlsx',
+    uploaded_at: '2026-10-05T00:00:00+00:00',
+    sheets: [{ name: 'Ventas', rows: 2, cols: 2 }],
+  }
+
+  function mockLibro() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL | Request) => {
+        const href = String(url)
+        if (href.includes('/sheets/Ventas/rows')) return Promise.resolve(jsonResponse(sheetRows))
+        if (href.endsWith('/workbooks/demo')) return Promise.resolve(jsonResponse(manifest))
+        return Promise.resolve(jsonResponse({ detail: 'no mockeado' }, 404))
+      }),
+    )
+  }
+
+  it('se abre solo la primera vez y, al cerrarlo, no vuelve a abrirse', async () => {
+    localStorage.removeItem('easyexcel-tour-visto')
+    mockLibro()
+    const primera = render(<App />)
+    expect(await screen.findByRole('dialog', {}, { timeout: 3000 })).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(localStorage.getItem('easyexcel-tour-visto')).toBe('true')
+    primera.unmount()
+
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('el botón «Tour guiado» lo abre cuando ya se ha visto', async () => {
+    mockLibro()
+    render(<App />)
+    await waitFor(() => expect(screen.getByText(/Sesión local/)).toBeInTheDocument())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Tour guiado/ }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+})

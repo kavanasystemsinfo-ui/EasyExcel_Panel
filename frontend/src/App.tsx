@@ -51,6 +51,8 @@ import Sidebar from './Sidebar'
 import Toolbar from './Toolbar'
 import Topbar from './Topbar'
 import UploadZone from './UploadZone'
+import { CLAVE_TOUR_VISTO, useTour } from './useTour'
+import { tourGenerico, toursDemo } from './tours'
 import { borrarSesion, cargarSesion, guardarSesion, nuevoToken } from './session'
 
 function messageOf(error: unknown, fallback: string): string {
@@ -468,6 +470,30 @@ function App() {
     }
   }
 
+  // Tour guiado: uno por vista en el libro demo y uno corto en un archivo propio.
+  const tourDefs = esDemo
+    ? toursDemo({ irASeccion: cambiarSeccion })
+    : tourGenerico({ irASeccion: cambiarSeccion })
+  const tour = useTour(tourDefs)
+  const claveTourActual = esDemo ? seccion : 'generico'
+  const hayLibro = wb !== null
+  const tourAutoRef = useRef(false)
+  // La primera vez que se entra (y solo si no se ha completado nunca), se abre solo.
+  useEffect(() => {
+    if (!hayLibro || tourAutoRef.current) return
+    tourAutoRef.current = true
+    let visto = false
+    try {
+      visto = localStorage.getItem(CLAVE_TOUR_VISTO) === 'true'
+    } catch {
+      /* sin almacenamiento: se abre */
+    }
+    if (visto) return
+    const aviso = setTimeout(() => tour.start(esDemo ? 'resumen' : 'generico'), 900)
+    return () => clearTimeout(aviso)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayLibro])
+
   function irA(hojaDestino: string, fila: number) {
     setSeccion('datos')
     seleccionarHoja(hojaDestino)
@@ -579,6 +605,7 @@ function App() {
           onExportPdf={exportarPdf}
           titulo={esDemo ? 'Panel de Operaciones' : wb.filename}
           esDemo={esDemo}
+          onTour={() => tour.start(claveTourActual)}
         />
 
         <div className="app-content">
@@ -751,6 +778,8 @@ function App() {
           </section>
         </div>
       </div>
+
+      <tour.TourComponent {...tour.tourProps} />
 
       <input
         ref={fileRef}

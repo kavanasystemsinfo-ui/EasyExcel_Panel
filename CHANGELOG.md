@@ -4,6 +4,9 @@ Todo lo notable de EasyExcel Panel, con formato [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Added
+- **Tour guiado (17/11/2026)**: recorrido de 17 pasos repartido en las 4 vistas del libro demo (Resumen, Personal, Operaciones y Datos), encadenados con «Sí, llévame», y un recorrido corto de 3 pasos para un archivo propio. Se abre solo la primera vez, se repite con el botón «Tour guiado» de la barra superior, y se maneja con las flechas y Esc. El motor es el del tour de Kavana Manufacturing adaptado a CSS normal (`Tour.tsx`, `useTour.tsx`); los pasos viven en `tours.ts` y se anclan a elementos que ya existen.
+
 ### Changed
 - **Espera del libro demo (17/11/2026)**: mientras el demo carga ya no se muestra la zona de subida (el visitante intentaba subir su archivo sin esperar); se ve una pantalla de espera con spinner y, a los 8 s, el aviso de arranque del servidor gratuito. La zona de subida solo aparece si el demo falla (con «Reintentar»).
 

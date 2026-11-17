@@ -18,6 +18,7 @@ type Props = {
   onExportPdf?: () => void
   titulo?: string
   esDemo?: boolean
+  onTour?: () => void
 }
 
 function Topbar({
@@ -35,6 +36,7 @@ function Topbar({
   onExportPdf,
   titulo = 'Panel de Operaciones',
   esDemo = true,
+  onTour,
 }: Props) {
   const [abierto, setAbierto] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -128,6 +130,20 @@ function Topbar({
           onExcel={() => onExportExcel?.()}
           onPdf={() => onExportPdf?.()}
         />
+        {onTour ? (
+          <button
+            type="button"
+            className="btn btn-tour"
+            onClick={onTour}
+            title="Tour guiado de esta vista"
+            aria-label="Tour guiado"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              explore
+            </span>
+            <span className="tour-txt">Tour guiado</span>
+          </button>
+        ) : null}
         <button type="button" className="btn btn-primary" onClick={onUploadClick}>
           Cargar archivo
         </button>
